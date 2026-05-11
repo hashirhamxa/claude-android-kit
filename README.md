@@ -8,6 +8,7 @@ Ships as:
 - **4 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`.
 - **5 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`.
 - **4 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, and diagnosing Gradle failures.
+- **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and converting Figma/Stitch/screenshots to pixel-faithful Compose code.
 - **2 templates** — per-project `CLAUDE.md` for pure Android and KMP.
 
 ---
@@ -68,6 +69,7 @@ claude-android-kit/
 ├── agents/         # Specialized subagents (~/.claude/agents/)
 ├── commands/       # Slash commands (~/.claude/commands/)
 ├── skills/         # Workflow definitions (~/.claude/skills/)
+│   └── ui-from-image/   # Figma / Stitch / screenshot → Compose
 ├── templates/      # Project-level CLAUDE.md templates
 ├── README.md       # You are here
 ├── GUIDE.md        # Reference manual — what each file does, when to override, KMP deep dive
