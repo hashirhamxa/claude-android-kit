@@ -12,11 +12,47 @@ Ships as:
 
 ## Hooks
 
-Hooks add a small runtime layer on top of the rules: session resume/persistence, warn-only Kotlin and manifest audits, and one hard stop for accidental release builds. Manual install for now is direct: copy `hooks/hooks.json` to `~/.claude/hooks.json`, copy `scripts/` to `~/.claude/scripts/`, and use `CAK_HOOK_PROFILE`, `CAK_DISABLED_HOOKS`, `CAK_SESSION_START_CONTEXT=off`, `CAK_SESSION_PERSISTENCE=off`, or `ALLOW_RELEASE_BUILD=1` when you need an escape hatch instead of editing the files.
+Hooks add a small runtime layer on top of the rules: session resume/persistence, warn-only Kotlin and manifest audits, and one hard stop for accidental release builds. Install them with `./install.sh --profile full` (or `.\install.ps1 -Profile full` on Windows). Use `CAK_HOOK_PROFILE`, `CAK_DISABLED_HOOKS`, `CAK_SESSION_START_CONTEXT=off`, `CAK_SESSION_PERSISTENCE=off`, or `ALLOW_RELEASE_BUILD=1` when you need an escape hatch instead of editing the files. Full hook docs live in `hooks/README.md`.
 
 ---
 
 ## Install
+
+### Option A — Automated (recommended)
+
+```bash
+git clone https://github.com/hashirhamxa/claude-android-kit.git
+cd claude-android-kit
+
+# macOS / Linux
+./install.sh --profile core
+
+# Windows PowerShell
+.\install.ps1 -Profile core
+```
+
+Profiles:
+
+| Profile | What's included |
+|---|---|
+| `minimal` | rules + agents |
+| `core` | rules + agents + commands + skills *(default)* |
+| `full` | core + hooks + scripts |
+
+Other flags: `--dry-run` (preview without copying), `--force` (overwrite existing files), `--without hooks` (skip hooks even in full), `--uninstall` (remove everything CAK installed).
+
+After install, manage your installation with `node scripts/cak.js`:
+
+```bash
+node scripts/cak.js doctor          # check all installed files are present
+node scripts/cak.js repair          # re-copy any missing files from the kit
+node scripts/cak.js list-installed  # list every managed file
+node scripts/cak.js uninstall       # clean removal using the state file
+```
+
+---
+
+### Option B — Manual
 
 ```bash
 git clone https://github.com/hashirhamxa/claude-android-kit.git

@@ -23,6 +23,7 @@ Read it top-to-bottom once. After that, treat it as a reference.
 13. [Extending the kit](#13-extending-the-kit)
 14. [Troubleshooting](#14-troubleshooting)
 15. [FAQ](#15-faq)
+16. [Installing the kit — automated option](#16-installing-the-kit--automated-option)
 
 ---
 
@@ -1210,6 +1211,99 @@ Run it whenever things feel off:
 ```bash
 bash ~/.claude/doctor.sh
 ```
+
+---
+
+## 16. Installing the kit — automated option
+
+The manual install in [Quick start](#3-quick-start) works, but the installer handles edge cases (existing files, selective profiles, clean uninstall) without you thinking about them.
+
+### Two ways to install
+
+**Option A — Script (recommended)**
+
+```bash
+# macOS / Linux
+./install.sh --profile core
+
+# Windows PowerShell
+.\install.ps1 -Profile core
+```
+
+**Option B — Manual**
+
+The `cp` commands in [Quick start](#3-quick-start) are still valid. Use them if you want to see exactly what goes where, or if you're installing on a machine without bash.
+
+### Profiles
+
+| Profile | Installs |
+|---|---|
+| `minimal` | rules + agents — the core conventions, no shortcuts |
+| `core` | minimal + commands + skills — the full day-to-day surface *(default)* |
+| `full` | core + hooks + scripts — adds the runtime layer |
+
+Start with `core`. Add `full` when you want session persistence and the pre-tool safety checks.
+
+### Useful flags
+
+```bash
+./install.sh --dry-run               # preview every copy without touching anything
+./install.sh --force                 # overwrite existing files (use after a kit update)
+./install.sh --profile full --without hooks   # full profile minus hooks/scripts
+./install.sh --uninstall             # remove everything CAK installed (reads state file)
+```
+
+### The state file
+
+Every install writes `~/.claude/.cak-install-state.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "profile": "core",
+  "installedAt": "2026-05-14T10:00:00Z",
+  "files": [
+    "/Users/you/.claude/rules/cak/common/git-workflow.md",
+    "..."
+  ]
+}
+```
+
+This is what makes `doctor`, `repair`, and `uninstall` safe — they only touch files that were explicitly recorded, never guessing.
+
+### doctor and repair
+
+After a kit update or if something feels off, run the lifecycle commands from the kit root:
+
+```bash
+node scripts/cak.js doctor          # [OK] or [MISSING] for every managed file
+node scripts/cak.js repair          # re-copies any missing files from the kit source
+node scripts/cak.js list-installed  # full list of CAK-managed files
+node scripts/cak.js version         # print the kit version
+```
+
+`repair` reconstructs the source path from the destination path, so it finds its own source files automatically. It only copies missing files; present files are left alone.
+
+### Uninstalling cleanly
+
+```bash
+# Script
+./install.sh --uninstall
+
+# Or via cak.js
+node scripts/cak.js uninstall
+```
+
+Both read the state file and remove exactly the listed files. If the state file is missing, neither will guess — they exit with an error instead. To then remove `~/.claude/rules/cak/` entirely (which may be empty after uninstall), do it manually.
+
+### Updating the kit
+
+```bash
+git pull                          # pull latest kit changes
+./install.sh --profile core --force  # overwrite with updated files
+```
+
+The `--force` flag overwrites without prompting. Without it, files that already exist are skipped.
 
 ---
 

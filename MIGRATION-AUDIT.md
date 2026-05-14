@@ -214,3 +214,18 @@ Files updated during Phase 2:
 - `README.md`
 - `GUIDE.md`
 - `MIGRATION-AUDIT.md`
+
+## 16. Phase 4 — Executed
+
+New files created:
+
+- `VERSION` — kit version string (`0.2.0`)
+- `install.sh` — bash installer (macOS/Linux); supports `--profile minimal|core|full`, `--without hooks`, `--dry-run`, `--force`, `--uninstall`; writes `~/.claude/.cak-install-state.json`
+- `install.ps1` — PowerShell installer (Windows); identical contract to `install.sh`; uses `param()` block with `-Profile`, `-DryRun`, `-Force`, `-WithoutHooks`, `-Uninstall`
+- `scripts/cak.js` — Node.js lifecycle CLI; commands: `list-installed`, `doctor`, `repair`, `uninstall`, `version`; no external dependencies; cross-platform via `os.homedir()` and `path.join()`
+
+Files updated during Phase 4:
+
+- `README.md` — replaced manual install block with Option A (automated) + Option B (manual); updated hooks blurb to reference `--profile full`
+- `GUIDE.md` — added ToC entry and section 16 "Installing the kit — automated option" covering both install options, profiles, state file, doctor/repair workflow, and clean uninstall
+- `MIGRATION-AUDIT.md` — added this Phase 4 section
