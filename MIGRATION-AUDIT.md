@@ -229,3 +229,31 @@ Files updated during Phase 4:
 - `README.md` — replaced manual install block with Option A (automated) + Option B (manual); updated hooks blurb to reference `--profile full`
 - `GUIDE.md` — added ToC entry and section 16 "Installing the kit — automated option" covering both install options, profiles, state file, doctor/repair workflow, and clean uninstall
 - `MIGRATION-AUDIT.md` — added this Phase 4 section
+
+## 17. Phase 5 — Executed
+
+### Files touched
+
+| File | Change |
+| --- | --- |
+| `README.md` | Added v0.2.0 version label with link to CHANGELOG.md; updated agent count from 4 to 8 with full list of all 8 agent names |
+| `GUIDE.md` | Added Section 6 entries for `@android-build-resolver`, `@android-security-reviewer`, `@kotlin-reviewer`, `@room-migration-planner`; updated "How agents actually get used" with dispatch notes for new agents; fixed stale "five .md files" → "seven .md files" in troubleshooting; removed shipped items (hooks, security-reviewer) from FAQ "What's missing" list; updated Appendix A quick reference card to list all 8 agents; updated Appendix C health check script to check all 8 agents |
+| `MIGRATION-AUDIT.md` | Added this Phase 5 section |
+| `CHANGELOG.md` | Created |
+
+`WORKFLOW.md` — reviewed; no changes needed. No old flat rule paths found; all rule references already use the correct `~/.claude/rules/cak/` namespaced paths.
+
+### Final surface count
+
+| Surface | Count | Detail |
+| --- | --- | --- |
+| Rules | 12 | `common/` ×4, `kotlin/` ×1, `android/` ×4, `kmp/` ×3 |
+| Agents | 8 | `android-architect`, `compose-reviewer`, `gradle-resolver`, `kmp-migration-planner`, `android-build-resolver`, `android-security-reviewer`, `kotlin-reviewer`, `room-migration-planner` |
+| Commands | 7 | `new-android`, `new-kmm`, `new-feature`, `compose-review`, `gradle-fix`, `ui-from-image`, `audit-kit` |
+| Skills | 5 | `new-project-android`, `new-project-kmm`, `feature-vertical-slice`, `gradle-troubleshooting`, `ui-from-image` |
+| Hooks | 1 file (5 entries) | `hooks/hooks.json` — SessionStart context injection, Stop persistence, SessionEnd lifecycle marker, PreToolUse release build guard, PostToolUse kt-lint + manifest audit |
+| Templates | 2 | `CLAUDE.android.template.md`, `CLAUDE.kmm.template.md` |
+
+### Summary: v0.1.0 → v0.2.0
+
+v0.1.0 shipped a flat kit: 8 rules with numeric prefixes, 4 agents, 7 commands, 5 skills, and 2 templates — no runtime layer, no install tooling. v0.2.0 restructures rules into 12 files across four namespaced subdirectories (`common/`, `kotlin/`, `android/`, `kmp/`) matching the ECC layering model, splits two mixed-scope rule files (testing, security) into six platform-specific files, adds a script-backed hook runtime with 5 hook entries covering session persistence, warn-only lint/manifest audits, and a release build guard, introduces a manifest-aware installer (`install.sh` + `install.ps1`) with three profiles and a Node.js lifecycle CLI (`cak.js`), and adds four new specialist agents (`@android-build-resolver`, `@android-security-reviewer`, `@kotlin-reviewer`, `@room-migration-planner`) extending coverage into compile-time failures, Android security auditing, domain-layer code review, and Room schema migrations. The kit is documented at v0.2.0 with full install tooling and a CHANGELOG.

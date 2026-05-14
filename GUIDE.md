@@ -351,6 +351,54 @@ Or paste the whole error log. The agent knows what to look for.
 
 > @kmp-migration-planner I want to share TransactionRepository from the Android app to Maidan's shared module. It currently uses Room and OkHttp.
 
+### `@android-build-resolver` (Sonnet)
+
+**Scope:** Android compile-time failures — R8/ProGuard stripping, KSP/KAPT processor conflicts, Compose Compiler ↔ Kotlin version mismatches, version catalog collisions, and KMP expect/actual compile errors. Gradle script errors go to `@gradle-resolver`; this agent handles failures during and after compilation.
+
+**Invoke when:** `assembleRelease`, `minifyRelease`, or KSP/KAPT tasks fail. If the build fails before compilation even starts, use `@gradle-resolver` instead.
+
+**Output shape:** Error category → Root cause → Fix → Why it works → Verify command → Prevent next time.
+
+**Example prompt:**
+
+> @android-build-resolver the release build is failing with "Missing class com.example.data.remote.dto.UserResponse" after enabling R8
+
+### `@android-security-reviewer` (Sonnet)
+
+**Scope:** Android-specific security surfaces — Manifest component exposure, network security config, secrets hygiene, storage choices, token handling, ProGuard source retention, and dependency hygiene. General Kotlin security concerns are governed by `rules/common/security.md`.
+
+**Invoke when:** before merging any PR that touches auth, storage, networking, or the manifest. Good habit before every release branch cut.
+
+**Output shape:** Files reviewed → Summary verdict → Blocking issues (file:line, vulnerability, remediation) → Risk items → Out of scope.
+
+**Example prompt:**
+
+> @android-security-reviewer review the auth module changes before this PR merges to main
+
+### `@kotlin-reviewer` (Sonnet)
+
+**Scope:** Non-UI Kotlin code review — repositories, use-cases, mappers, DTOs, domain models, AppContainer wiring, and coroutine scopes. For composable files, use `@compose-reviewer`.
+
+**Invoke when:** any data or domain layer diff. Pair with `@compose-reviewer` for full-stack PR review.
+
+**Output shape:** Files reviewed → Summary verdict → Blocking issues (file:line, problem, fix) → Non-blocking nits → Good patterns.
+
+**Example prompt:**
+
+> @kotlin-reviewer shared/src/commonMain/.../data/repository/BookRepository.kt
+
+### `@room-migration-planner` (Sonnet)
+
+**Scope:** Room database migrations — reads the schema export diff, determines whether `AutoMigration` applies or a manual `Migration` class is needed, generates the migration with correct SQLite DDL, and writes the `MigrationTestHelper` test.
+
+**Invoke when:** any `@Entity` change that requires a database version increment.
+
+**Output shape:** Schema diff summary → AutoMigration or manual → Migration class → Schema export note → Migration test → Register in database.
+
+**Example prompt:**
+
+> @room-migration-planner I added a `createdAt: Long` column to UserEntity and bumped the DB version from 3 to 4
+
 ### How agents actually get used
 
 Most of the time, you don't call agents by hand. The slash commands call them for you:
@@ -360,7 +408,14 @@ Most of the time, you don't call agents by hand. The slash commands call them fo
 - `/compose-review` delegates entirely to `@compose-reviewer`.
 - `/gradle-fix` delegates to `@gradle-resolver`.
 
-You only invoke agents explicitly when you want their specific framing — usually `@android-architect` for an architecture conversation that didn't fit a command.
+The four newer specialists are invoked directly — no command dispatches to them automatically:
+
+- `@android-build-resolver` when a release or KSP build fails at compile time, not Gradle script level.
+- `@android-security-reviewer` before any PR touching auth, storage, networking, or the manifest.
+- `@kotlin-reviewer` on any data or domain layer diff; pairs with `@compose-reviewer` for full-stack review.
+- `@room-migration-planner` whenever an `@Entity` change requires a database version increment.
+
+You only invoke `@android-architect` explicitly when you want an architecture conversation that didn't fit a command.
 
 ---
 
@@ -987,7 +1042,7 @@ If Claude says "I don't have access to that file," your Claude Code setup isn't 
 ls ~/.claude/commands/
 ```
 
-Should list the five `.md` files. Commands are resolved by filename (minus the `.md`).
+Should list the seven `.md` files. Commands are resolved by filename (minus the `.md`).
 
 Some Claude Code versions need a restart after adding commands. Try restarting the CLI.
 
@@ -1087,10 +1142,8 @@ Edit whenever you notice a drift between the kit's assumptions and your current 
 Most likely additions, in order of impact:
 
 1. **Per-project `CLAUDE.md`** for each active project (Maidan, MoviePick, TamaamPaisa). Even a 50-line one beats nothing.
-2. **Hooks** for session-start/session-end memory persistence (pattern from the affaan-m everything-claude-code repo). Useful when you switch between projects often.
-3. **MCP configs** for GitHub, Supabase, Firebase. If Claude Code can talk to those services directly, a lot of tasks become one-step.
-4. **Firebase patterns** and **Supabase patterns** as separate skills, once you've got enough project experience to write them authoritatively.
-5. A **security-reviewer** agent specifically for Android/mobile concerns (permissions, exported components, manifest hardening).
+2. **MCP configs** for GitHub, Supabase, Firebase. If Claude Code can talk to those services directly, a lot of tasks become one-step.
+3. **Firebase patterns** and **Supabase patterns** as separate skills, once you've got enough project experience to write them authoritatively.
 
 Ask for any of them when you're ready.
 
@@ -1113,6 +1166,10 @@ Pin this somewhere:
 @compose-reviewer                    UI code review
 @gradle-resolver                     Build fixes
 @kmp-migration-planner               commonMain/platform restructuring
+@android-build-resolver              Compile errors, R8, KSP/KAPT
+@android-security-reviewer           Pre-release security audit
+@kotlin-reviewer                     Data/domain layer review
+@room-migration-planner              Room schema migrations
 
 ~/.claude/rules/cak/                 Global rules
 ~/.claude/agents/                    Agents
@@ -1186,7 +1243,7 @@ done
 
 echo
 echo "Agents:"
-for f in android-architect.md compose-reviewer.md gradle-resolver.md kmp-migration-planner.md; do
+for f in android-architect.md compose-reviewer.md gradle-resolver.md kmp-migration-planner.md android-build-resolver.md android-security-reviewer.md kotlin-reviewer.md room-migration-planner.md; do
     check "$HOME/.claude/agents/$f"
 done
 

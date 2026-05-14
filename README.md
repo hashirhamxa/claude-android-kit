@@ -2,10 +2,12 @@
 
 A Claude Code starter kit for Android & Kotlin Multiplatform. Drop it into `~/.claude/` and every new project inherits opinionated defaults — **Manual DI, Compose, Clean Architecture + MVVM, Ktor, Room/SQLDelight, Firebase, Supabase.**
 
+**Version 0.2.0** — see [CHANGELOG.md](./CHANGELOG.md).
+
 Ships as:
 
 - **4 rule packs (12 files total)** — `common/`, `kotlin/`, `android/`, `kmp/`.
-- **4 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`.
+- **8 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`, `@android-build-resolver`, `@android-security-reviewer`, `@kotlin-reviewer`, `@room-migration-planner`.
 - **7 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`, `/ui-from-image`, `/audit-kit`.
 - **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and generating UI from images.
 - **2 templates** — per-project `CLAUDE.md` for pure Android and KMP.
