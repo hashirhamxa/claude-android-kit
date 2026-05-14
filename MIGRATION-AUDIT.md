@@ -194,3 +194,23 @@ Notes:
 - `rules/android/compose-patterns.md` gained the approved top comment noting it currently covers both Jetpack Compose and Compose Multiplatform.
 - `rules/common/testing.md` now points to `rules/android/testing.md` and `rules/kmp/testing.md`, and both platform files point back to `common/testing.md`.
 - `rules/common/security.md` retains the original mandatory-baseline opening line, and the new platform files point back to `common/security.md`.
+
+## 15. Phase 2 — Executed
+
+New files added for the hook runtime:
+
+- `scripts/lib/utils.js`
+- `scripts/hooks/session-start.js`
+- `scripts/hooks/session-end.js`
+- `scripts/hooks/kt-lint-check.js`
+- `scripts/hooks/manifest-audit.js`
+- `scripts/hooks/release-guard.js`
+- `hooks/hooks.json`
+- `hooks/README.md`
+
+Files updated during Phase 2:
+
+- `.gitignore`
+- `README.md`
+- `GUIDE.md`
+- `MIGRATION-AUDIT.md`

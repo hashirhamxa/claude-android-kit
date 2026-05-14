@@ -161,6 +161,10 @@ current conversation  >  project CLAUDE.md  >  ~/.claude/rules/cak/
 
 If you say "for this task, use Hilt instead of AppContainer," Claude does that for this task. The rule stays unchanged for next time.
 
+### Hooks
+
+Hooks are the runtime checks around tool execution. Rules shape every answer; hooks react to concrete events: `SessionStart` can load `.claude-android-kit-state/last-session.md`, `Stop` overwrites that file with a fresh local summary, `PreToolUse` blocks accidental release Gradle commands, and `PostToolUse` warns after Kotlin or manifest edits without stopping the turn. Use `CAK_HOOK_PROFILE=minimal|standard|strict` to choose how much runs, `CAK_DISABLED_HOOKS` to disable one hook by ID, and `CAK_SESSION_START_CONTEXT=off` or `CAK_SESSION_PERSISTENCE=off` to break the session-persistence loop when you want a clean run. Full hook docs live in `hooks/README.md`.
+
 ---
 
 ## 5. The rules — what fires every turn

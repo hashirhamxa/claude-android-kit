@@ -10,6 +10,10 @@ Ships as:
 - **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and generating UI from images.
 - **2 templates** — per-project `CLAUDE.md` for pure Android and KMP.
 
+## Hooks
+
+Hooks add a small runtime layer on top of the rules: session resume/persistence, warn-only Kotlin and manifest audits, and one hard stop for accidental release builds. Manual install for now is direct: copy `hooks/hooks.json` to `~/.claude/hooks.json`, copy `scripts/` to `~/.claude/scripts/`, and use `CAK_HOOK_PROFILE`, `CAK_DISABLED_HOOKS`, `CAK_SESSION_START_CONTEXT=off`, `CAK_SESSION_PERSISTENCE=off`, or `ALLOW_RELEASE_BUILD=1` when you need an escape hatch instead of editing the files.
+
 ---
 
 ## Install
@@ -82,6 +86,8 @@ claude-android-kit/
 ├── rules/          # Namespaced rule packs (~/.claude/rules/cak/)
 ├── agents/         # Specialized subagents (~/.claude/agents/)
 ├── commands/       # Slash commands (~/.claude/commands/)
+├── hooks/          # Hook config and hook docs
+├── scripts/        # Node hook implementations and shared helpers
 ├── skills/         # Workflow definitions (~/.claude/skills/)
 │   └── ui-from-image/   # Figma / Stitch / screenshot → Compose
 ├── templates/      # Project-level CLAUDE.md templates
@@ -125,7 +131,7 @@ If you want to version your own evolution:
 
 ```bash
 cd ~/.claude
-git init   # tracks rules/, agents/, commands/, skills/
+git init   # tracks rules/, agents/, commands/, skills/, hooks/, scripts/
 ```
 
 ---

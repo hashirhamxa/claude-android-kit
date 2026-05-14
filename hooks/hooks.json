@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/session-start.js"
+          }
+        ],
+        "description": "Load repo-local session context at startup",
+        "id": "cak:session-start"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/release-guard.js"
+          }
+        ],
+        "description": "Block accidental release Gradle commands",
+        "id": "cak:release-guard"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/kt-lint-check.js"
+          }
+        ],
+        "description": "Warn on ktlint failures after Kotlin edits",
+        "id": "cak:kt-lint"
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/manifest-audit.js"
+          }
+        ],
+        "description": "Warn on risky AndroidManifest changes",
+        "id": "cak:manifest-audit"
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/session-end.js"
+          }
+        ],
+        "description": "Persist a repo-local session summary after each response",
+        "id": "cak:session-end"
+      }
+    ]
+  }
+}
