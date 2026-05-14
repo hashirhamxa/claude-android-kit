@@ -4,10 +4,10 @@ A Claude Code starter kit for Android & Kotlin Multiplatform. Drop it into `~/.c
 
 Ships as:
 
-- **7 rules** that fire every turn (Kotlin style, Android architecture, Compose patterns, KMP layering, testing, security, git workflow).
+- **8 rules** that fire every turn (Kotlin style, Android architecture, Compose patterns, KMP layering, testing, security, git workflow, productivity & anti-duplication).
 - **4 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`.
-- **5 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`.
-- **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and converting Figma/Stitch/screenshots to pixel-faithful Compose code.
+- **7 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`, `/ui-from-image`, `/audit-kit`.
+- **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and generating UI from images.
 - **2 templates** — per-project `CLAUDE.md` for pure Android and KMP.
 
 ---

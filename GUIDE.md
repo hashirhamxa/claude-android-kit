@@ -73,8 +73,8 @@ Rules run every turn. Agents, commands, and skills run on demand.
 ### Install
 
 ```bash
-unzip hash-claude-starter.zip
-cd hash-claude-starter
+git clone https://github.com/hashirhamxa/claude-android-kit.git
+cd claude-android-kit
 
 mkdir -p ~/.claude/rules ~/.claude/agents ~/.claude/commands ~/.claude/skills
 
@@ -152,7 +152,7 @@ If you say "for this task, use Hilt instead of AppContainer," Claude does that f
 
 The rules are the single most important part of the kit. They're what make every response feel like *your* codebase, not generic Android advice.
 
-Seven files in `~/.claude/rules/`, each scoped to one concern. Here's what each enforces, when it matters, and when to override.
+Eight files in `~/.claude/rules/`, each scoped to one concern. Here's what each enforces, when it matters, and when to override.
 
 ### `01-kotlin-style.md`
 
@@ -222,6 +222,14 @@ This is a spike. Skip test generation unless explicitly requested.
 **When it matters most:** when Claude generates commits or opens PRs.
 
 **When to override:** if your team has a different convention (ticket numbers in branches, no squashing). Override at the project level.
+
+### `08-productivity-anti-duplication.md`
+
+**Enforces:** grep before create, read existing candidates fully, extend the current source of truth instead of forking parallel files, wire new files in the same turn, and verify after multi-file work.
+
+**When it matters most:** any feature or refactor that touches more than one file, especially when Claude is tempted to scaffold a sibling repository/use case/component instead of extending the one that's already there.
+
+**When to override:** rarely. The only reasonable exception is a deliberate architecture split that you've already decided at the project level; document that split explicitly in `CLAUDE.md` before asking Claude to create parallel structures.
 
 ### Reading tip
 
@@ -385,6 +393,32 @@ Delegates to `@gradle-resolver`, offers to apply the fix, re-runs to verify.
 
 **Cap:** it'll loop up to 3 diagnosis attempts. If that doesn't fix it, it stops and summarizes what was tried. Don't let it spin longer — escalate to a Build Scan (`--scan`) at that point.
 
+### `/ui-from-image [figma URL | stitch URL | image path | description]`
+
+Runs the visual-to-Compose workflow for Figma links, Stitch links, and screenshots.
+
+**What it does:**
+- Detects whether the target project is Android-only or KMP.
+- Loads the `ui-from-image` skill and follows its 8-phase workflow.
+- Scans for existing `CLAUDE.md`, theme files, and reusable UI components before generating code.
+- Resolves assets explicitly instead of inventing broken drawable or font references.
+
+**When to use it:** when you have a visual reference and want Claude to recreate it in Jetpack Compose or Compose Multiplatform.
+
+**When not to use it:** generic UI implementation with no visual reference, or review-only work on existing Compose code.
+
+### `/audit-kit`
+
+Runs a documentation and inventory audit on the kit itself.
+
+**What it does:**
+- Counts actual rule, agent, command, skill, and template files.
+- Compares those counts with what's claimed in `README.md` and `GUIDE.md`.
+- Flags stale names, missing command/rule references, untracked kit assets, and empty directories.
+- Reports suggested edits without modifying anything.
+
+**When to use it:** before publishing, after restructuring the kit, or before cutting a release/PR that changes the kit layout.
+
 ### Choosing between agent and command
 
 Rule of thumb:
@@ -402,7 +436,7 @@ Skills live in `~/.claude/skills/<n>/SKILL.md`. They're deeper than commands —
 
 Claude activates a skill when its description matches the current task. You don't usually invoke skills directly; they back up commands or surface when you ask something that matches.
 
-Four skills in this kit:
+Five skills in this kit:
 
 ### `new-project-android`
 
@@ -431,6 +465,15 @@ Also has the decision tree for list / detail / form UI shapes.
 The diagnostic sequence for broken builds. Explicitly *not* a fix-it-yourself flowchart — the skill points to `@gradle-resolver` for the actual diagnosis. But the skill is what gives Claude the structure to ask the right questions before calling the agent.
 
 **You'll see it surface when:** `/gradle-fix` fires, or you describe a build issue.
+
+### `ui-from-image`
+
+The visual fidelity workflow for generating Compose or Compose Multiplatform UI from Figma, Stitch, or screenshot inputs.
+
+**You'll see it surface when:**
+- You run `/ui-from-image`.
+- You ask Claude to recreate a screen from a design file or screenshot.
+- You want generated UI to respect existing theme tokens and project conventions instead of freehanding a new style.
 
 ### Can I add a skill just by asking for it?
 
@@ -878,7 +921,7 @@ Verify the files are where Claude looks:
 ls ~/.claude/rules/
 ```
 
-Should list all seven rule files. If not, the copy step didn't work.
+Should list all eight rule files. If not, the copy step didn't work.
 
 Then verify Claude is reading them. Ask:
 
@@ -1006,11 +1049,13 @@ Ask for any of them when you're ready.
 Pin this somewhere:
 
 ```
-/new-android <name>                  Bootstrap Android project
-/new-kmm <n>                      Bootstrap KMP project
-/new-feature <n>                  Add vertical slice
-/compose-review <file|folder>        Review UI code
-/gradle-fix [cmd|log|paste]          Fix build failure
+/new-android <name>                          Bootstrap Android project
+/new-kmm <n>                                 Bootstrap KMP project
+/new-feature <n>                             Add vertical slice
+/compose-review <file|folder>                Review UI code
+/gradle-fix [cmd|log|paste]                  Fix build failure
+/ui-from-image [input]                       Generate UI from a visual reference
+/audit-kit                                   Audit docs vs kit inventory
 
 @android-architect                   Architecture decisions
 @compose-reviewer                    UI code review
@@ -1071,7 +1116,7 @@ check() {
 }
 
 echo "Rules:"
-for f in 01-kotlin-style.md 02-android-architecture.md 03-compose-patterns.md 04-kmm-layering.md 05-testing.md 06-security.md 07-git-workflow.md; do
+for f in 01-kotlin-style.md 02-android-architecture.md 03-compose-patterns.md 04-kmm-layering.md 05-testing.md 06-security.md 07-git-workflow.md 08-productivity-anti-duplication.md; do
     check "$HOME/.claude/rules/$f"
 done
 
@@ -1083,13 +1128,13 @@ done
 
 echo
 echo "Commands:"
-for f in new-android.md new-kmm.md new-feature.md compose-review.md gradle-fix.md; do
+for f in new-android.md new-kmm.md new-feature.md compose-review.md gradle-fix.md ui-from-image.md audit-kit.md; do
     check "$HOME/.claude/commands/$f"
 done
 
 echo
 echo "Skills:"
-for d in new-project-android new-project-kmm feature-vertical-slice gradle-troubleshooting; do
+for d in new-project-android new-project-kmm feature-vertical-slice gradle-troubleshooting ui-from-image; do
     check "$HOME/.claude/skills/$d/SKILL.md"
 done
 
