@@ -93,7 +93,7 @@ Brain-dump the idea, then ask for decisions. Don't ask "what should I build" —
 > - Offline-first: every action works without network
 > - Sync across devices for the same user
 >
-> **My stack preferences (from `~/.claude/rules/`):**
+> **My stack preferences (from `~/.claude/rules/cak/`):**
 > - Kotlin Multiplatform, Compose Multiplatform UI
 > - Manual DI (no Hilt/Koin), AppContainer expect/actual
 > - Ktor, SQLDelight, Napier
@@ -441,7 +441,7 @@ Claude Code refactors. Re-run tests. Re-run the review — should come back clea
 It happens. Usually one of:
 
 - **Infinite tool-calling loop.** The agent keeps reading files without producing output. Interrupt it with Ctrl+C and re-prompt with more specificity.
-- **Suggests something that conflicts with your rules.** The rules didn't load for some reason. Check `ls ~/.claude/rules/` and restart Claude Code.
+- **Suggests something that conflicts with your rules.** The rules didn't load for some reason. Check `ls ~/.claude/rules/cak/` and restart Claude Code.
 - **Can't figure out a subtle bug.** Usually means the task is too large or too vague. Break it down and ask for one sub-task at a time.
 
 When it gets stuck on something nuanced, move *back* to claude.ai. Paste the context, describe the symptom, let the thinking partner help. Then bring the answer back.
@@ -453,7 +453,7 @@ Before releasing:
 1. **Run `/gradle-fix`** if there are lingering warnings you've been ignoring.
 2. **Full test run:** `./gradlew test`.
 3. **Release build:** `./gradlew :composeApp:assembleRelease` — checks R8/ProGuard doesn't strip something needed.
-4. **Pre-release checklist** from `~/.claude/rules/06-security.md` — no debug logging, no hardcoded keys, Supabase RLS policies deployed, Firebase/Supabase rules locked.
+4. **Pre-release checklist** from `~/.claude/rules/cak/common/security.md` — no debug logging, no hardcoded keys, Supabase RLS policies deployed, Firebase/Supabase rules locked.
 5. **Tag, push, release.**
 
 ---
@@ -725,7 +725,7 @@ If you also use a Cursor-like tool, the split is:
 - **Claude Code:** broader reasoning, multi-file changes, running commands, git operations.
 - **claude.ai:** design and documents.
 
-They don't compete. They complement. The kit's `~/.claude/rules/` files can often be pointed at by Cursor too (via `.cursorrules` referencing them), so the same opinions follow you across tools.
+They don't compete. They complement. The kit's `~/.claude/rules/cak/` files can often be pointed at by Cursor too (via `.cursorrules` referencing them), so the same opinions follow you across tools.
 
 ### What stays out of every AI tool
 

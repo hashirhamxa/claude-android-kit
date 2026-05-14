@@ -1,3 +1,5 @@
+<!-- Applies to both Jetpack Compose and Compose Multiplatform.
+     If a CMP-specific section grows significantly, split into android/compose.md + kmp/compose.md. -->
 # Compose Patterns
 
 Rules for Jetpack Compose and Compose Multiplatform. Apply the same way regardless of target.

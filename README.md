@@ -4,7 +4,7 @@ A Claude Code starter kit for Android & Kotlin Multiplatform. Drop it into `~/.c
 
 Ships as:
 
-- **8 rules** that fire every turn (Kotlin style, Android architecture, Compose patterns, KMP layering, testing, security, git workflow, productivity & anti-duplication).
+- **4 rule packs (12 files total)** — `common/`, `kotlin/`, `android/`, `kmp/`.
 - **4 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`.
 - **7 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`, `/ui-from-image`, `/audit-kit`.
 - **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and generating UI from images.
@@ -18,13 +18,28 @@ Ships as:
 git clone https://github.com/hashirhamxa/claude-android-kit.git
 cd claude-android-kit
 
-mkdir -p ~/.claude/rules ~/.claude/agents ~/.claude/commands ~/.claude/skills
+mkdir -p ~/.claude/agents ~/.claude/commands ~/.claude/skills
 
-cp    rules/*    ~/.claude/rules/
+# Namespaced under cak/ so it coexists with other kits
+mkdir -p ~/.claude/rules/cak
+
+# Everyone installs common + your primary stack
+cp -r rules/common  ~/.claude/rules/cak/
+cp -r rules/kotlin  ~/.claude/rules/cak/
+
+# Android-only project
+cp -r rules/android ~/.claude/rules/cak/
+
+# KMP project
+cp -r rules/kmp     ~/.claude/rules/cak/
+# (install android/ too if your KMP app has an Android target with Compose UI)
+
 cp    agents/*   ~/.claude/agents/
 cp    commands/* ~/.claude/commands/
 cp -r skills/*   ~/.claude/skills/
 ```
+
+A pure Android project needs `common/ + kotlin/ + android/`. A KMP project needs all four.
 
 The `templates/` stay with you — copy the right one into each new project as `CLAUDE.md` and fill in placeholders.
 
@@ -64,7 +79,7 @@ Add a feature:
 
 ```
 claude-android-kit/
-├── rules/          # Global rules (~/.claude/rules/)
+├── rules/          # Namespaced rule packs (~/.claude/rules/cak/)
 ├── agents/         # Specialized subagents (~/.claude/agents/)
 ├── commands/       # Slash commands (~/.claude/commands/)
 ├── skills/         # Workflow definitions (~/.claude/skills/)
@@ -95,7 +110,7 @@ Project-level `CLAUDE.md` beats this kit when they disagree. Override at the pro
 ## Layering
 
 ```
-~/.claude/rules/          ← global, always on (this kit)
+~/.claude/rules/cak/      ← global, always on (this kit)
 <project>/CLAUDE.md       ← per-project, overrides globals
 current conversation      ← overrides everything for one task
 ```

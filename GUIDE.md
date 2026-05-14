@@ -47,7 +47,7 @@ Three layers, from most general to most specific:
 
 ```
 ┌──────────────────────────────────────────────┐
-│  ~/.claude/rules/*.md                        │  ← Globals — always on
+│  ~/.claude/rules/cak/...                    │  ← Globals — always on
 │  (This kit lives here)                       │
 ├──────────────────────────────────────────────┤
 │  <project>/CLAUDE.md                         │  ← Per-project — overrides globals
@@ -76,13 +76,28 @@ Rules run every turn. Agents, commands, and skills run on demand.
 git clone https://github.com/hashirhamxa/claude-android-kit.git
 cd claude-android-kit
 
-mkdir -p ~/.claude/rules ~/.claude/agents ~/.claude/commands ~/.claude/skills
+mkdir -p ~/.claude/agents ~/.claude/commands ~/.claude/skills
 
-cp    rules/*    ~/.claude/rules/
+# Namespaced under cak/ so it coexists with other kits
+mkdir -p ~/.claude/rules/cak
+
+# Everyone installs common + your primary stack
+cp -r rules/common  ~/.claude/rules/cak/
+cp -r rules/kotlin  ~/.claude/rules/cak/
+
+# Android-only project
+cp -r rules/android ~/.claude/rules/cak/
+
+# KMP project
+cp -r rules/kmp     ~/.claude/rules/cak/
+# (install android/ too if your KMP app has an Android target with Compose UI)
+
 cp    agents/*   ~/.claude/agents/
 cp    commands/* ~/.claude/commands/
 cp -r skills/*   ~/.claude/skills/
 ```
+
+A pure Android project needs `common/ + kotlin/ + android/`. A KMP project needs all four.
 
 Keep the cloned directory somewhere permanent (not Downloads) — you'll come back to edit it.
 
@@ -130,7 +145,7 @@ That's the whole loop. Everything else in this guide is refinement.
 
 When you send a prompt to Claude Code:
 
-1. Claude reads the user's rules (`~/.claude/rules/*`) — the whole kit enters the conversation as context.
+1. Claude reads the user's rules (`~/.claude/rules/cak/`) — the whole kit enters the conversation as context.
 2. Claude reads the project's `CLAUDE.md` if it exists.
 3. Claude reads your prompt and any files you reference.
 4. If your prompt starts with `/`, the matching command definition fires (if present in `~/.claude/commands/`). The command is a prompt-within-a-prompt that tells Claude what workflow to run.
@@ -141,7 +156,7 @@ When you send a prompt to Claude Code:
 **Rule hierarchy** — when two sources of guidance conflict:
 
 ```
-current conversation  >  project CLAUDE.md  >  ~/.claude/rules/
+current conversation  >  project CLAUDE.md  >  ~/.claude/rules/cak/
 ```
 
 If you say "for this task, use Hilt instead of AppContainer," Claude does that for this task. The rule stays unchanged for next time.
@@ -152,9 +167,9 @@ If you say "for this task, use Hilt instead of AppContainer," Claude does that f
 
 The rules are the single most important part of the kit. They're what make every response feel like *your* codebase, not generic Android advice.
 
-Eight files in `~/.claude/rules/`, each scoped to one concern. Here's what each enforces, when it matters, and when to override.
+They now live under `~/.claude/rules/cak/` in four packs. Install `common/` plus your main stack. A pure Android project needs `common/ + kotlin/ + android/`. A KMP project needs all four.
 
-### `01-kotlin-style.md`
+### `kotlin/kotlin-style.md`
 
 **Enforces:** immutability first (`val`, data classes, immutable collections), no `!!` in production, `Result`/sealed `Outcome` at module boundaries, coroutines with structured concurrency, no wildcard imports, idiomatic scope function usage.
 
@@ -162,7 +177,7 @@ Eight files in `~/.claude/rules/`, each scoped to one concern. Here's what each 
 
 **When to override:** if you're working on a library that needs to interop with Java (sometimes `!!` or `@JvmStatic` is the only way). Override at the project level with a short note in `CLAUDE.md` explaining the exception.
 
-### `02-android-architecture.md`
+### `android/android-architecture.md`
 
 **Enforces:** Manual DI via `AppContainer` (no Hilt/Koin), Clean Architecture + MVVM, feature-first package structure, `StateFlow<UiState>` in view models, single-activity navigation.
 
@@ -178,15 +193,15 @@ AppContainer is not applicable here.
 
 Claude will respect it.
 
-### `03-compose-patterns.md`
+### `android/compose-patterns.md`
 
 **Enforces:** state hoisting, `Route`/`Screen` split (stateless previewable Screen, VM-wiring Route), `collectAsStateWithLifecycle`, `LaunchedEffect` with correct keys, stable types, `key = { it.id }` on lazy lists, no hardcoded colors.
 
 **When it matters most:** any Compose code. This is the single most frequently triggered rule in practice.
 
-**When to override:** rarely. Compose conventions are well-established and this file tracks them closely.
+**When to override:** rarely. This file currently covers both Jetpack Compose and Compose Multiplatform; split it only when CMP-specific guidance becomes meaningfully different.
 
-### `04-kmm-layering.md`
+### `kmp/kmm-layering.md`
 
 **Enforces:** `commonMain`-first mindset, `expect`/`actual` as last resort, platform-specific engines in platform mains, SQLDelight over Room for KMP, interface + factory pattern over large `expect class`.
 
@@ -194,9 +209,9 @@ Claude will respect it.
 
 **When to override:** project-level if you want to allow Room in a hybrid setup (e.g. Android app shares domain code with an iOS companion but keeps Room for Android storage).
 
-### `05-testing.md`
+### `common/testing.md`
 
-**Enforces:** fakes over mocks, ~90% domain coverage / ~75% data / ~70% VM, Turbine for Flow, `runTest` + `advanceTimeBy` (never `delay`), parser/regex tests as fixtures with real-world samples, TDD where the spec is clear.
+**Enforces:** testing philosophy, coverage targets, fakes over mocks, Flow testing discipline, parser/regex fixture tests, naming, what-not-to-test, and TDD where the spec is clear.
 
 **When it matters most:** when Claude writes any code that includes logic (not just configuration). Especially parsers — see the TamaamPaisa SMS dedup context.
 
@@ -207,15 +222,47 @@ Claude will respect it.
 This is a spike. Skip test generation unless explicitly requested.
 ```
 
-### `06-security.md`
+### `android/testing.md`
 
-**Enforces:** no secrets in source (`local.properties` + `BuildConfig`), Supabase RLS on every table, Firebase rules locked by default, certificate pinning in release, `EncryptedSharedPreferences` for tokens, no PII in logs, manifest hardening.
+**Enforces:** ViewModel state-transition tests, in-memory Room coverage, Compose UI tests for critical flows, minimal instrumented coverage, and Paparazzi/Roborazzi snapshots where visuals matter.
 
-**When it matters most:** any time Claude wires networking, storage, or auth.
+**When it matters most:** Android-only features, Room migrations, and high-value Compose screens.
 
-**When to override:** never. Security rules are the one set you don't soften. Override at the task level if a specific dev-time workaround is needed, but don't bake it into `CLAUDE.md`.
+**When to override:** only when the project deliberately trades test depth for speed (for example, a throwaway demo).
 
-### `07-git-workflow.md`
+### `kmp/testing.md`
+
+**Enforces:** `commonTest` / `androidTest` / `iosTest` structure, SQLDelight `TestDriver` coverage, and Mockative only when fakes won't do.
+
+**When it matters most:** shared business logic, KMP storage, and any code that has to behave the same on Android and iOS.
+
+**When to override:** rarely. If a shared module is intentionally thin, say so in the project's `CLAUDE.md`.
+
+### `common/security.md`
+
+**Enforces:** the mandatory security baseline: secrets out of git, CI hygiene, dependency review, Supabase/Firebase guardrails, and a release checklist.
+
+**When it matters most:** every project, every stage. This is the one pack you don't skip.
+
+**When to override:** never at the kit level. Use a task-level exception only when you must, and remove it immediately after.
+
+### `android/security.md`
+
+**Enforces:** Android build secret wiring, manifest hardening, cleartext/network config, encrypted storage, token handling, Timber/Crashlytics discipline, and runtime permission rules.
+
+**When it matters most:** any time Claude touches networking, auth, storage, or the manifest on Android.
+
+**When to override:** almost never. If you must, make it explicit and temporary.
+
+### `kmp/security.md`
+
+**Enforces:** iOS-side KMP security basics — ATS intact, Keychain for sensitive storage, entitlements reviewed before release.
+
+**When it matters most:** any KMP app that ships an iOS target.
+
+**When to override:** effectively never.
+
+### `common/git-workflow.md`
 
 **Enforces:** Conventional Commits, branch naming (`feature/`, `fix/`, etc.), small PRs, no commented-out code, no unowned TODOs.
 
@@ -223,7 +270,7 @@ This is a spike. Skip test generation unless explicitly requested.
 
 **When to override:** if your team has a different convention (ticket numbers in branches, no squashing). Override at the project level.
 
-### `08-productivity-anti-duplication.md`
+### `common/productivity-anti-duplication.md`
 
 **Enforces:** grep before create, read existing candidates fully, extend the current source of truth instead of forking parallel files, wire new files in the same turn, and verify after multi-file work.
 
@@ -233,7 +280,7 @@ This is a spike. Skip test generation unless explicitly requested.
 
 ### Reading tip
 
-When you want to know "will Claude follow X here?" — open the relevant rule file and skim. Three minutes of reading the file beats thirty minutes of prompt iteration.
+When you want to know "will Claude follow X here?" — open the relevant file under `~/.claude/rules/cak/` and skim. Three minutes of reading the file beats thirty minutes of prompt iteration.
 
 ---
 
@@ -664,7 +711,7 @@ These are why the kit is the kit. Changing them means you've fundamentally chang
 
 Some projects genuinely need different conventions. Put the override in that project's `CLAUDE.md`, not in the kit:
 
-- Project inherits Hilt / Koin → override `02-android-architecture.md`'s DI rule.
+- Project inherits Hilt / Koin → override `android/android-architecture.md`'s DI rule.
 - Project requires Fragments (e.g. MapBox or some legacy SDK) → note it.
 - Project has a stricter or looser min-SDK requirement.
 - Project uses a different networking stack (Retrofit instead of Ktor, though why).
@@ -674,7 +721,7 @@ Some projects genuinely need different conventions. Put the override in that pro
 
 You've changed a preference permanently. Edit the kit:
 
-- You've adopted a new preferred library across all projects (say, you've standardized on `voyager-navigator` for KMP nav). Update `04-kmm-layering.md` to mention it.
+- You've adopted a new preferred library across all projects (say, you've standardized on `voyager-navigator` for KMP nav). Update `kmp/kmm-layering.md` to mention it.
 - You've hit the same pitfall in 3+ projects. Add it as a "common pitfall" to the relevant rule or skill.
 - You've found yourself typing the same clarifying preamble into Claude repeatedly. That's a rule ready to be written.
 
@@ -823,13 +870,13 @@ You'll want to add to this over time. Here's how each piece grows.
 
 ### Adding a new rule
 
-Copy an existing rule file as a starting structure:
+Copy a file from the pack it belongs to as a starting structure:
 
 ```bash
-cp ~/.claude/rules/01-kotlin-style.md ~/.claude/rules/08-analytics.md
+cp ~/.claude/rules/cak/kotlin/kotlin-style.md ~/.claude/rules/cak/android/analytics.md
 ```
 
-Edit the content. The file name's number determines load order; pick something sensible (analytics might be 08, a new security sub-rule might be 06a).
+The directory carries the scope now (`common/`, `kotlin/`, `android/`, `kmp/`). Pick a descriptive filename instead of a numeric prefix.
 
 Keep rules focused. One file per concern. A 500-line rule file usually means you need two files.
 
@@ -918,14 +965,14 @@ Often two fit. For instance, "review my Compose code" is both an agent (`@compos
 Verify the files are where Claude looks:
 
 ```bash
-ls ~/.claude/rules/
+ls ~/.claude/rules/cak/
 ```
 
-Should list all eight rule files. If not, the copy step didn't work.
+Should list `common/`, `kotlin/`, `android/`, and `kmp/`. If not, the copy step didn't work.
 
 Then verify Claude is reading them. Ask:
 
-> What's in ~/.claude/rules/02-android-architecture.md?
+> What's in ~/.claude/rules/cak/android/android-architecture.md?
 
 If Claude says "I don't have access to that file," your Claude Code setup isn't configured to auto-load `~/.claude/` contents. Check your Claude Code settings.
 
@@ -965,7 +1012,7 @@ Force-activate a skill by referencing its name in the prompt:
 By design, the project's `CLAUDE.md` wins. If Claude is following a global rule instead of your project override, the override is probably ambiguously worded. Be explicit:
 
 ```markdown
-## DI (overrides ~/.claude/rules/02-android-architecture.md)
+## DI (overrides ~/.claude/rules/cak/android/android-architecture.md)
 This project uses Hilt. Do not apply AppContainer guidance here.
 ```
 
@@ -979,7 +1026,7 @@ Before running any scaffolder, commit what you have. `git` is the real safety ne
 
 ### Claude suggests Hilt or Koin anyway
 
-The Manual DI rule is in `02-android-architecture.md`. Check that file is present. If it is and Claude still suggests Hilt, the context window might be dropping rules (common with very long conversations). Start a fresh conversation and try again.
+The Manual DI rule is in `android/android-architecture.md`. Check that file is present under `~/.claude/rules/cak/`. If it is and Claude still suggests Hilt, the context window might be dropping rules (common with very long conversations). Start a fresh conversation and try again.
 
 ---
 
@@ -1062,7 +1109,7 @@ Pin this somewhere:
 @gradle-resolver                     Build fixes
 @kmp-migration-planner               commonMain/platform restructuring
 
-~/.claude/rules/                     Global rules
+~/.claude/rules/cak/                 Global rules
 ~/.claude/agents/                    Agents
 ~/.claude/commands/                  Slash commands
 ~/.claude/skills/                    Workflows
@@ -1116,8 +1163,20 @@ check() {
 }
 
 echo "Rules:"
-for f in 01-kotlin-style.md 02-android-architecture.md 03-compose-patterns.md 04-kmm-layering.md 05-testing.md 06-security.md 07-git-workflow.md 08-productivity-anti-duplication.md; do
-    check "$HOME/.claude/rules/$f"
+for f in \
+    common/git-workflow.md \
+    common/productivity-anti-duplication.md \
+    common/testing.md \
+    common/security.md \
+    kotlin/kotlin-style.md \
+    android/android-architecture.md \
+    android/compose-patterns.md \
+    android/testing.md \
+    android/security.md \
+    kmp/kmm-layering.md \
+    kmp/testing.md \
+    kmp/security.md; do
+    check "$HOME/.claude/rules/cak/$f"
 done
 
 echo
