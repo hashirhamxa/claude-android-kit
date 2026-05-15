@@ -17,19 +17,19 @@ Bootstrap a new Kotlin Multiplatform project.
 
 1. **Delegate to the `android-architect` agent** (same agent handles KMP decisions) for confirmation of the structure and target platforms. Default: Android + iOS. If the user needs desktop or web, surface that question.
 
-2. **File structure:**
+2. **File structure (AGP 9.0 compatible):**
    ```
    <root>/
    ├── CLAUDE.md                               # From templates/CLAUDE.kmm.template.md
    ├── README.md
    ├── .gitignore                              # Android + Kotlin + Xcode
    ├── build.gradle.kts                        # Root
-   ├── settings.gradle.kts                     # Targets androidApp, shared, iosApp (as a subfolder, not Gradle)
+   ├── settings.gradle.kts                     # Includes :shared, :androidApp (+ :desktopApp if needed)
    ├── gradle.properties
    ├── gradle/
    │   └── libs.versions.toml
-   ├── shared/
-   │   ├── build.gradle.kts
+   ├── shared/                                 # Pure KMP library — no android application plugin
+   │   ├── build.gradle.kts                   # kotlin("multiplatform") + android.library + compose
    │   └── src/
    │       ├── commonMain/
    │       │   ├── kotlin/<package-path>/
@@ -43,6 +43,8 @@ Bootstrap a new Kotlin Multiplatform project.
    │       │   │   │   └── repository/
    │       │   │   ├── di/
    │       │   │   │   └── AppContainer.kt     # expect class
+   │       │   │   ├── ui/                     # Shared Compose screens + view models
+   │       │   │   │   └── home/
    │       │   │   └── util/
    │       │   └── sqldelight/<package-path>/  # .sq files
    │       ├── commonTest/
@@ -53,23 +55,20 @@ Bootstrap a new Kotlin Multiplatform project.
    │       ├── iosMain/
    │       │   └── kotlin/<package-path>/
    │       │       ├── di/AppContainer.kt      # actual
+   │       │       ├── MainViewController.kt   # iOS Compose entry point
    │       │       └── platform/
    │       └── iosTest/
-   ├── composeApp/                             # Compose Multiplatform app (Android + shared UI)
-   │   ├── build.gradle.kts
-   │   └── src/
-   │       ├── commonMain/                     # Shared composables
-   │       ├── androidMain/
-   │       │   └── kotlin/<package-path>/
-   │       │       ├── App.kt
-   │       │       └── MainActivity.kt
-   │       ├── iosMain/                        # iOS entry bridge
-   │       └── desktopMain/                    # Optional — omit unless requested
+   ├── androidApp/                             # Android application module (thin shell)
+   │   ├── build.gradle.kts                   # com.android.application only — no multiplatform
+   │   └── src/main/
+   │       ├── AndroidManifest.xml
+   │       └── kotlin/<package-path>/
+   │           └── MainActivity.kt             # Sets up AppContainer, calls setContent { App() }
    └── iosApp/                                 # Xcode project (not Gradle-managed)
        ├── iosApp.xcodeproj/
        └── iosApp/
            ├── iOSApp.swift
-           └── ContentView.swift               # Bridges to Compose
+           └── ContentView.swift               # Bridges to Compose via MainViewController
    ```
 
 3. **libs.versions.toml defaults:**
@@ -90,10 +89,11 @@ Bootstrap a new Kotlin Multiplatform project.
    - Ktor engine dependencies: `ktor-client-okhttp` in androidMain, `ktor-client-darwin` in iosMain.
    - SQLDelight driver deps matched by source set.
 
-5. **composeApp/build.gradle.kts:**
-   - Plugins: `kotlin("multiplatform")`, `org.jetbrains.compose`, `android-application`.
-   - Targets: androidTarget, iosX64/Arm64/SimulatorArm64 (framework pointing at iosApp).
-   - Compose dependencies in commonMain: `compose.runtime`, `compose.foundation`, `compose.material3`, `compose.components.resources`.
+5. **androidApp/build.gradle.kts:**
+   - Plugin: `com.android.application` only. No `kotlin("multiplatform")`, no Compose plugin.
+   - `dependencies` block: `implementation(project(":shared"))`, `androidx.activity.compose`.
+   - Standard `android` block: namespace, compileSdk, defaultConfig (applicationId, minSdk, targetSdk, versionCode, versionName), compileOptions.
+   - AGP 9.0 compatible by design — application plugin is isolated in its own module.
 
 6. **AppContainer expect/actual** — skeleton showing one repository wired up. Include a fake implementation in commonTest to demonstrate the testing pattern.
 
@@ -128,6 +128,7 @@ Bootstrap a new Kotlin Multiplatform project.
 - Napier or Kermit for logging, never `println` in shared code.
 - Version catalog.
 - iosApp is an Xcode project at the repo root, not a Gradle module — this is the standard KMP structure.
+- AGP 9.0 compatible: `com.android.application` lives only in `androidApp/`, never in `shared/`.
 
 ## Questions to ask
 
@@ -141,7 +142,7 @@ Bootstrap a new Kotlin Multiplatform project.
 End with:
 - Path to the project.
 - Commands:
-  - `./gradlew :composeApp:assembleDebug` — build Android.
+  - `./gradlew :androidApp:assembleDebug` — build Android.
   - `./gradlew :shared:linkDebugFrameworkIosSimulatorArm64` — build iOS framework.
   - `cd iosApp && open iosApp.xcodeproj` — open iOS in Xcode.
 - Reminder: `local.properties` with secret keys before running.

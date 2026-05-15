@@ -21,6 +21,43 @@ shared/
     └── iosTest/
 ```
 
+## Project module structure (AGP 9.0+)
+
+AGP 9.0 forbids applying the `com.android.application` plugin inside a module that also has `kotlin("multiplatform")`. The canonical KMP project structure separates concerns into distinct Gradle modules.
+
+Default layout:
+
+```
+<AppName>/
+├── shared/             <- pure KMP library (kotlin("multiplatform") + com.android.library)
+├── androidApp/         <- Android entry point (com.android.application only, depends on :shared)
+├── desktopApp/         <- optional desktop entry point (depends on :shared)
+├── webApp/             <- optional web entry point (depends on :shared)
+└── iosApp/             <- Xcode project (not a Gradle module)
+```
+
+The `shared` module contains all domain, data, and shared UI code, including Compose Multiplatform screens and view models. Platform app modules are thin shells that wire the platform entry point and depend on `:shared`.
+
+**The invariant:** `shared/build.gradle.kts` must have `kotlin("multiplatform")` and `com.android.library`. It must never have `com.android.application`.
+
+Verify with:
+
+```bash
+grep "android.application" shared/build.gradle.kts   # must return nothing
+```
+
+**Migration signal:** If your project has a single `composeApp` module applying both `kotlin("multiplatform")` and `com.android.application`, it needs migration before AGP 9.0. Invoke `@kmp-migration-planner` with the prompt "migrate from composeApp monolith to shared + androidApp structure."
+
+Optional split for projects with native platform UI:
+
+```
+shared-logic/    <- business logic only (no Compose dependency)
+shared-ui/       <- shared Compose UI (depends on :shared-logic)
+androidApp/      <- depends on :shared-ui and :shared-logic
+```
+
+Use the shared-logic / shared-ui split when some platform targets use native UI (e.g. SwiftUI on iOS) and you want to avoid a Compose dependency in the shared module for those targets. For projects where all targets use Compose Multiplatform, a single `shared` module is sufficient.
+
 ## What goes in commonMain
 
 - Domain models, use cases, repository interfaces.

@@ -130,3 +130,48 @@ Not every Android file belongs in commonMain. Flag these as "keep Android-only":
 - Any `View`-based or Android UI thread work.
 
 If the engineer insists on sharing these, flag the cost and offer a minimal shared interface for the business logic only.
+
+## New KMP module structure (composeApp -> shared + platform modules)
+
+AGP 9.0 forbids `com.android.application` inside a `kotlin("multiplatform")` module. When asked about restructuring or when you detect the old layout, produce a migration plan using the steps below.
+
+**Identifying the old structure:** A single `composeApp` module whose `build.gradle.kts` applies both `alias(libs.plugins.kotlin.multiplatform)` and `alias(libs.plugins.android.application)`.
+
+**Migration plan — steps in order:**
+
+1. Rename `composeApp/` to `shared/` (or verify `shared/` already exists as the pure KMP library).
+2. In `shared/build.gradle.kts`, change the plugin from `android.application` to `android.library`. Remove `applicationId`, `targetSdk`, and `versionCode` from the `android` block — those belong in the app module.
+3. Move all Compose UI source (`App.kt`, route composables, view models) to `shared/src/commonMain/` if they are not already there. iOS entry point (`MainViewController.kt`) stays in `shared/src/iosMain/`.
+4. Create `androidApp/` as a new Gradle module with a single plugin: `com.android.application`. Wire `implementation(project(":shared"))` in its `dependencies` block.
+5. Move `AndroidManifest.xml` and `MainActivity` (or equivalent `ComponentActivity` subclass) from `shared/src/androidMain/` to `androidApp/src/main/`.
+6. Update `settings.gradle.kts`: replace `include(":composeApp")` with `include(":androidApp")`. Add `include(":desktopApp")`, `include(":webApp")` only if those targets exist.
+7. Update the Xcode Build Phase run script: change `:composeApp:embedAndSignAppleFrameworkForXcode` to `:shared:embedAndSignAppleFrameworkForXcode`. Update Framework Search Paths from `composeApp/build/xcode-frameworks/...` to `shared/build/xcode-frameworks/...`.
+8. Update all import references: any class that moved from `composeApp` source sets to `shared` source sets needs its package path verified — the package name itself usually does not change, but confirm no stale references.
+9. Verify: `./gradlew :androidApp:assembleDebug`, then `./gradlew :shared:linkDebugFrameworkIosSimulatorArm64`. Both must succeed before considering the migration complete.
+
+**Handling the optional shared-logic / shared-ui split:**
+
+Propose this split only when at least one platform target uses native UI (SwiftUI on iOS) and the team wants to avoid pulling a Compose dependency into the shared module for that target. In that case:
+- `shared-logic/` gets `kotlin("multiplatform")` with no Compose plugin.
+- `shared-ui/` gets `kotlin("multiplatform")` + Compose plugins, depends on `:shared-logic`.
+- Platform app modules depend on whichever they need.
+
+For projects where all targets use Compose Multiplatform, the single-shared-module layout is simpler and preferred.
+
+**AGP 9.0 hard requirement:** State this explicitly in every migration plan. The old `composeApp` monolith layout will fail to build under AGP 9.0. This is not optional.
+
+## Migration checklist
+
+Append this checklist to every composeApp -> shared + androidApp migration plan:
+
+- [ ] `shared/build.gradle.kts` has `alias(libs.plugins.android.library)` — not `android.application`
+- [ ] `shared/build.gradle.kts` has no `applicationId`, `targetSdk`, or `versionCode`
+- [ ] `AndroidManifest.xml` is in `androidApp/src/main/` — not in `shared/`
+- [ ] `MainActivity` (or equivalent entry `ComponentActivity`) is in `androidApp/` — not in `shared/`
+- [ ] `settings.gradle.kts` includes `:androidApp` (and `:desktopApp`, `:webApp` if applicable) — not `:composeApp`
+- [ ] Root `build.gradle.kts` AGP version is 9.0-compatible (check the AGP release notes for the exact minimum)
+- [ ] All `:composeApp` Gradle references in build files updated to `:shared` or `:androidApp` as appropriate
+- [ ] Xcode Build Phase run script points to `:shared:embedAndSignAppleFrameworkForXcode`
+- [ ] Xcode Framework Search Paths point to `shared/build/xcode-frameworks/...`
+- [ ] `./gradlew :androidApp:assembleDebug` passes
+- [ ] `./gradlew :shared:linkDebugFrameworkIosSimulatorArm64` passes
