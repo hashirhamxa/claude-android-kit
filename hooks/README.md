@@ -86,6 +86,12 @@ Default: unset
 What it does: allows release install/build commands that `cak:release-guard` would otherwise block.
 Example: `export ALLOW_RELEASE_BUILD=1`
 
+### `CAK_FEEDBACK_LOGGING`
+
+Default: `on`
+What it does: controls whether the `cak:session-end` hook appends a JSON line to `~/.claude/.cak-feedback.jsonl`. Set to `off` to disable passive session logging entirely.
+Example: `export CAK_FEEDBACK_LOGGING=off`
+
 ## Disabling a specific hook
 
 Use `CAK_DISABLED_HOOKS` with one or more hook IDs:

@@ -111,6 +111,50 @@ function buildSummary() {
   return `${lines.join('\n')}\n`;
 }
 
+function isFeedbackLoggingEnabled() {
+  return String(process.env.CAK_FEEDBACK_LOGGING || 'on').trim().toLowerCase() !== 'off';
+}
+
+function getKitVersion() {
+  try {
+    const versionPath = path.join(__dirname, '..', '..', 'VERSION');
+    const fs = require('fs');
+    if (fs.existsSync(versionPath)) {
+      return fs.readFileSync(versionPath, 'utf8').trim();
+    }
+    const installedVersion = path.join(require('os').homedir(), '.claude', '.cak-install-state.json');
+    if (fs.existsSync(installedVersion)) {
+      const state = JSON.parse(fs.readFileSync(installedVersion, 'utf8'));
+      return state.version || null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function writeFeedbackEntry(cwd, branchName) {
+  if (!isFeedbackLoggingEnabled()) {
+    return;
+  }
+  try {
+    const os = require('os');
+    const fs = require('fs');
+    const feedbackPath = path.join(os.homedir(), '.claude', '.cak-feedback.jsonl');
+    const entry = {
+      timestamp: new Date().toISOString(),
+      project: path.basename(cwd) || cwd,
+      branch: branchName || null,
+      cwd,
+      kit_version: getKitVersion(),
+      session_marker: 'stop_hook',
+    };
+    fs.appendFileSync(feedbackPath, JSON.stringify(entry) + '\n', 'utf8');
+  } catch {
+    // feedback logging must never break a session
+  }
+}
+
 function main() {
   if (!isHookEnabled(HOOK_ID)) {
     return;
@@ -120,7 +164,11 @@ function main() {
     return;
   }
 
+  const cwd = process.cwd();
+  const branchName = findGitBranch(cwd);
+
   writeTextFile(getStateFilePath(), buildSummary());
+  writeFeedbackEntry(cwd, branchName);
 }
 
 try {

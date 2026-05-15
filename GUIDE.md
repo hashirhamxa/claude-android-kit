@@ -1364,4 +1364,68 @@ The `--force` flag overwrites without prompting. Without it, files that already 
 
 ---
 
+## 17. Measuring the kit
+
+The kit ships with a small feedback system so v0.3.0 decisions are evidence-based, not speculative. It has two layers: a passive session log written automatically, and a manual project log you fill in as you work.
+
+### Why it exists
+
+Without measurement, kit improvements are driven by memory and gut feel. With even a few weeks of structured feedback you can see which agents are actually useful, which hooks generate noise, and what's missing entirely.
+
+### The two layers
+
+**Passive log — `~/.claude/.cak-feedback.jsonl`**
+
+Written automatically by the `cak:session-end` hook whenever a Claude Code session ends. Each line is a JSON object with timestamp, project name, git branch, cwd, kit version, and the session marker `stop_hook`. This gives you session frequency and project activity without any manual effort.
+
+No data leaves your machine. The file is local-only.
+
+To disable: `export CAK_FEEDBACK_LOGGING=off`
+
+**Manual log — `<project>/.claude/cak-feedback.md`**
+
+A freeform reflection log you keep per project. Add a dated line whenever the kit helped, annoyed, gave wrong advice, or missed something. Tag each line with `[help]`, `[noise]`, `[wrong]`, `[missing]`, or `[bug]`. Three to six words per entry is enough.
+
+### Starting on a new project
+
+```bash
+node scripts/cak.js feedback --init
+```
+
+This copies `templates/cak-feedback.template.md` to `.claude/cak-feedback.md` in the current directory. Open it and add entries as you work. Commit the file with the project.
+
+### Running the weekly report
+
+```bash
+node scripts/cak.js feedback
+```
+
+Prints a markdown report to stdout covering the last week. To look further back or across multiple projects:
+
+```bash
+node scripts/cak.js feedback --weeks 4
+node scripts/cak.js feedback --weeks 2 --projects /path/to/ProjectA,/path/to/ProjectB
+```
+
+Pipe to a file to save:
+
+```bash
+node scripts/cak.js feedback --weeks 4 > feedback-report.md
+```
+
+### What to look for
+
+- **[help] entries naming an agent or command** — confirms those surfaces are worth keeping. Agents never mentioned in [help] after a few weeks are candidates for removal or description improvements.
+- **[noise] entries naming a hook** — three or more for the same hook is a signal to tune or disable it.
+- **[missing] entries clustering on a topic** — three or more entries mentioning the same concept (e.g. "Room migration") is a v0.3.0 candidate: write a skill or agent for it.
+- **[wrong] entries naming one agent** — two or more is a signal to review that agent's system prompt for the pattern causing incorrect advice.
+
+The report's Recommendations section computes these automatically when there is enough data. When data is thin, it says so explicitly rather than fabricating signals.
+
+### Privacy
+
+`~/.claude/.cak-feedback.jsonl` is local-only. `cak-feedback-report.js` makes no network calls. Nothing is sent anywhere.
+
+---
+
 That's the whole guide. If something in here is unclear or missing, that's a signal to improve the guide — edit this file, commit, move on. It's meant to grow with you.

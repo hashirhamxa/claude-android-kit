@@ -16,6 +16,8 @@ Ships as:
 
 Hooks add a small runtime layer on top of the rules: session resume/persistence, warn-only Kotlin and manifest audits, and one hard stop for accidental release builds. Install them with `./install.sh --profile full` (or `.\install.ps1 -Profile full` on Windows). Use `CAK_HOOK_PROFILE`, `CAK_DISABLED_HOOKS`, `CAK_SESSION_START_CONTEXT=off`, `CAK_SESSION_PERSISTENCE=off`, or `ALLOW_RELEASE_BUILD=1` when you need an escape hatch instead of editing the files. Full hook docs live in `hooks/README.md`.
 
+Run `node scripts/cak.js feedback` weekly to see how the kit is performing for you and what to change next.
+
 ---
 
 ## Install

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1] -- 2026-05-15
+
+### Added
+
+- Feedback logging in `cak:session-end` hook -- appends one JSON line to `~/.claude/.cak-feedback.jsonl` on session stop
+- `templates/cak-feedback.template.md` -- per-project reflection log template
+- `scripts/cak-feedback-report.js` -- weekly feedback aggregator; reads JSONL + per-project markdown logs; outputs markdown report to stdout
+- `cak.js feedback` subcommand -- runs the report with defaults; `--weeks N`, `--projects`, and `--init` flags
+- `CAK_FEEDBACK_LOGGING` env var -- set to `off` to disable passive session logging
+- `GUIDE.md` section 17 -- Measuring the kit
+
+### Notes
+
+- Passive log captures session metadata only (timestamp, project, branch, cwd, kit version). Agent and command invocation tracking will follow when Claude Code exposes that state to hooks reliably.
+
+---
+
 ## [0.2.0] -- 2026-05-15
 
 ### Added

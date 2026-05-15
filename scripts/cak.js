@@ -55,6 +55,50 @@ function destToSource(destPath) {
   return path.join(KIT_ROOT, rel);
 }
 
+// ── feedback helpers ──────────────────────────────────────────────────────────
+
+const FEEDBACK_LOG    = path.join(INSTALL_ROOT, '.cak-feedback.jsonl');
+const FEEDBACK_REPORT = path.join(KIT_ROOT, 'scripts', 'cak-feedback-report.js');
+const FEEDBACK_TMPL   = path.join(KIT_ROOT, 'templates', 'cak-feedback.template.md');
+const FEEDBACK_DEST   = path.join(process.cwd(), '.claude', 'cak-feedback.md');
+
+function cmdFeedback(argv) {
+  const initFlag  = argv.includes('--init');
+  const weeksIdx  = argv.indexOf('--weeks');
+  const weeksArg  = weeksIdx !== -1 && argv[weeksIdx + 1] ? ['--weeks', argv[weeksIdx + 1]] : [];
+  const projIdx   = argv.indexOf('--projects');
+  const projArg   = projIdx  !== -1 && argv[projIdx  + 1] ? ['--projects', argv[projIdx  + 1]] : [];
+
+  if (initFlag) {
+    if (!fs.existsSync(FEEDBACK_TMPL)) {
+      process.stderr.write('[ERROR] Template not found: ' + FEEDBACK_TMPL + '\n');
+      process.exit(1);
+    }
+    if (fs.existsSync(FEEDBACK_DEST)) {
+      process.stdout.write('Already exists: ' + FEEDBACK_DEST + '\n');
+      process.stdout.write('Remove it first if you want a fresh copy.\n');
+      return;
+    }
+    fs.mkdirSync(path.dirname(FEEDBACK_DEST), { recursive: true });
+    fs.copyFileSync(FEEDBACK_TMPL, FEEDBACK_DEST);
+    process.stdout.write('Created: ' + FEEDBACK_DEST + '\n');
+    process.stdout.write('Edit the file to start logging kit interactions.\n');
+    return;
+  }
+
+  // run the report script in-process by spawning node to keep things simple
+  const { spawnSync } = require('child_process');
+  if (!fs.existsSync(FEEDBACK_REPORT)) {
+    process.stderr.write('[ERROR] Report script not found: ' + FEEDBACK_REPORT + '\n');
+    process.exit(1);
+  }
+  const result = spawnSync(process.execPath, [FEEDBACK_REPORT, ...weeksArg, ...projArg], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (result.status !== null) process.exitCode = result.status;
+}
+
 // ── commands ──────────────────────────────────────────────────────────────────
 
 function cmdVersion() {
@@ -175,13 +219,14 @@ const COMMANDS = {
   'repair':         cmdRepair,
   'uninstall':      cmdUninstall,
   'version':        cmdVersion,
+  'feedback':       null, // handled separately (passes remaining argv)
 };
 
 function showHelp() {
   process.stdout.write(`
 CAK lifecycle CLI
 
-Usage: node scripts/cak.js <command>
+Usage: node scripts/cak.js <command> [options]
 
 Commands:
   list-installed   list all CAK-managed files from the state file
@@ -189,6 +234,10 @@ Commands:
   repair           re-copy missing files from the kit source
   uninstall        remove all state-tracked files and the state file
   version          print the CAK version
+  feedback         print weekly feedback report (default: last 1 week)
+    --weeks N        look back N weeks (default: 1)
+    --projects p1,p2 project paths to read .claude/cak-feedback.md from
+    --init           copy feedback template to .claude/cak-feedback.md in cwd
 
 State file: ${STATE_FILE}
 `.trimStart());
@@ -198,6 +247,13 @@ const cmd = process.argv[2];
 
 if (!cmd || cmd === '--help' || cmd === '-h') {
   showHelp();
+} else if (cmd === 'feedback') {
+  try {
+    cmdFeedback(process.argv.slice(3));
+  } catch (err) {
+    process.stderr.write(`[ERROR] ${err.message}\n`);
+    process.exit(1);
+  }
 } else if (COMMANDS[cmd]) {
   try {
     COMMANDS[cmd]();
