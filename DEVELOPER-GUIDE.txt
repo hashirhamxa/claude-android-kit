@@ -1,0 +1,2525 @@
+CLAUDE-ANDROID-KIT v0.2.0
+COMPLETE DEVELOPER GUIDE
+
+================================================================================
+PART 1 -- WHAT THIS KIT IS AND WHY IT EXISTS
+================================================================================
+
+1.1 The Problem It Solves
+--------------------------
+
+Claude Code is a capable implementation agent. Out of the box, it knows Android
+and Kotlin well. What it does not know is you -- your DI choice, your layer
+boundaries, your preferred libraries, your naming conventions, and the
+trade-offs you have already settled. Every session starts from zero. Ask Claude
+to add a feature on Monday and it might use Hilt. Ask again on Thursday and it
+might suggest Koin. Neither reflects your actual project.
+
+The problem compounds across projects. If you maintain three Android apps and a
+KMP codebase, every Claude Code session requires you to re-establish context:
+"We use Manual DI. We use Ktor, not Retrofit. Repository writes to DB first,
+then syncs. No XML layouts." This is repeated overhead, and it still does not
+prevent Claude from drifting when the conversation gets long.
+
+The kit fixes this by embedding opinionated, project-aware conventions directly
+into Claude Code's context. Rules load on every turn so Claude already knows
+your DI approach before you type a word. Agents carry focused system prompts
+so specialists behave like specialists. Commands encode multi-step workflows
+so you do not have to re-explain "scaffold a vertical slice" each time. Skills
+carry the detailed recipes that back up those commands. The result is an agent
+that behaves like a senior Android developer who has been in your codebase
+before -- one who makes the same architectural choices you make, every session.
+
+1.2 Philosophy
+---------------
+
+The kit is built on six deliberate choices. Each is an opinion, not a law, but
+understanding the reasoning helps you know when to follow it and when to
+override it.
+
+Manual DI -- AppContainer over Hilt or Koin.
+
+Hilt is convenient. It is also annotation-processed, reflection-heavy, and
+opaque. You cannot read a Hilt-injected codebase and understand the dependency
+graph without chasing @Inject annotations across files. AppContainer is just a
+Kotlin interface. Reading AppContainer.kt for five minutes tells you every
+singleton and every scope in the app. Constructor injection everywhere means
+tests are trivial -- no @HiltAndroidApp, no BindValue, no test-specific
+modules. The dependency graph is explicit and compile-time-safe without any
+annotation processor running. Manual DI has a ceiling: a 300-feature app with
+dynamic feature modules might legitimately need Hilt's scoped components. That
+ceiling is high, and the migration is knowable when you reach it. The kit uses
+AppContainer until there is a concrete reason to switch.
+
+Compose everywhere -- no XML in new code.
+
+XML layouts require a separate mental model, a separate toolchain, and
+introduce the possibility of view binding mismatches and lifecycle complexity.
+Compose unifies UI declaration, state management, and navigation into a single
+Kotlin model. New code in Compose is simpler to test, simpler to preview, and
+simpler for Claude to generate correctly. Existing XML in legacy projects is
+fine -- the rule is no new XML, not delete all XML.
+
+Flow over LiveData -- StateFlow and SharedFlow in view models.
+
+LiveData was designed for the Android lifecycle. StateFlow and SharedFlow work
+in coroutines, in tests, and in KMP shared modules. StateFlow gives you a
+current value at any time. SharedFlow gives you a configurable replay and
+buffer. Both compose cleanly with Flow operators. LiveData in a KMP shared
+module does not compile at all. Using Flow from the start means your view model
+logic is portable and testable with standard coroutine test tooling.
+
+Offline-first -- local DB is source of truth.
+
+The network is unreliable. If your app makes a network call and updates the UI
+only on success, you have built an online-only app that feels broken on bad
+connections. Offline-first inverts this: write to the local database first,
+return immediately, enqueue a sync in the background. Room or SQLDelight
+provides the observable Flow. The UI never waits for the network -- it reads
+from the DB. The DB is updated by sync. This architecture requires a little
+more upfront design, which is exactly why the kit's scaffolding tools implement
+it by default.
+
+Vertical slices -- feature equals data plus domain plus ui plus di in one pass.
+
+Horizontal layering -- "build all repositories today, all view models tomorrow"
+-- produces half-working code that cannot be demoed or tested until every layer
+is done. A vertical slice delivers a complete, shippable unit: domain model,
+repository interface, repository implementation, view model, UI screen,
+navigation wiring, and tests. It can be demoed the day it is written. The slice
+may be thin (a static list) but it is end-to-end and real. This is why
+/new-feature produces every layer at once, and why the kit's skill for features
+has a "skip use case if it is a pass-through" rule -- skipping is deliberate,
+not lazy.
+
+Boring infrastructure -- Ktor, Room, WorkManager, Firebase, Supabase.
+
+Creativity should go into the product, not into evaluating networking libraries.
+Ktor is multiplatform, Kotlin-first, and well-maintained. Room is the standard
+for Android local storage. SQLDelight extends that to KMP. WorkManager handles
+background jobs reliably across Android versions. Firebase and Supabase are the
+most complete backend-as-a-service options for Kotlin apps. These choices have
+large communities, good documentation, and predictable behavior. The kit treats
+them as defaults so you can spend your tokens on product logic.
+
+1.3 What Ships in v0.2.0
+--------------------------
+
+Rules -- 12 files in 4 packs installed under ~/.claude/rules/cak/.
+
+  - common/ (4 files): git-workflow.md, productivity-anti-duplication.md,
+    security.md, testing.md. These fire for every project regardless of stack.
+  - kotlin/ (1 file): kotlin-style.md. Applies to all Kotlin code.
+  - android/ (4 files): android-architecture.md, compose-patterns.md,
+    security.md, testing.md. Android-specific conventions.
+  - kmp/ (3 files): kmm-layering.md, security.md, testing.md. KMP-specific
+    conventions. Extend the common rules for multiplatform.
+
+Agents -- 8 specialist sub-agents installed under ~/.claude/agents/.
+
+  @android-architect, @android-build-resolver, @android-security-reviewer,
+  @compose-reviewer, @gradle-resolver, @kmp-migration-planner,
+  @kotlin-reviewer, @room-migration-planner.
+
+Commands -- 7 slash commands installed under ~/.claude/commands/.
+
+  /new-android, /new-kmm, /new-feature, /compose-review, /gradle-fix,
+  /ui-from-image, /audit-kit.
+
+Skills -- 5 workflow recipes installed under ~/.claude/skills/.
+
+  new-project-android, new-project-kmm, feature-vertical-slice,
+  gradle-troubleshooting, ui-from-image.
+
+Hooks -- 5 hook entries defined in hooks/hooks.json, implemented in scripts/.
+
+  cak:session-start, cak:session-end, cak:release-guard, cak:kt-lint,
+  cak:manifest-audit.
+
+Install scripts -- 2.
+
+  install.sh for macOS and Linux. install.ps1 for Windows PowerShell.
+  Both support profiles and lifecycle flags.
+
+Templates -- 2.
+
+  CLAUDE.android.template.md for pure Android projects.
+  CLAUDE.kmm.template.md for KMP projects.
+  These are project-level CLAUDE.md starting points.
+
+1.4 What This Kit Is NOT
+-------------------------
+
+It is not a code generator that writes your app. It scaffolds starting points
+and fills layers according to your conventions. The product logic is yours.
+
+It is not a replacement for your own judgment. The kit shapes how Claude
+behaves. It does not override your decisions. If you tell Claude to do something
+differently for a task, it will. The rules are defaults, not locks.
+
+It is not a multi-harness tool. It is built for Claude Code. The rules are
+readable by other tools that understand markdown context files, but the agents,
+commands, and skills are Claude Code-specific.
+
+It is not opinionated about your product -- only about your conventions. The
+kit enforces DI style, layer boundaries, and library choices. It has nothing to
+say about your features, your data model, or your UX. Those are yours.
+
+
+================================================================================
+PART 2 -- INSTALLATION
+================================================================================
+
+2.1 Prerequisites
+------------------
+
+- Claude Code installed and working (the CLI that backs Claude Code).
+- Node.js installed (required for hooks -- session scripts run via node).
+- Git installed and available in the shell.
+- For Android work: Android Studio (current stable) and JDK 17.
+- For KMP work: Xcode (current stable) on macOS.
+
+2.2 Automated Install (Recommended)
+-------------------------------------
+
+Clone the kit somewhere permanent. Not Downloads -- you will come back to edit
+these files as your preferences evolve.
+
+    git clone https://github.com/hashirhamxa/claude-android-kit.git
+    cd claude-android-kit
+
+On macOS or Linux, run the shell installer:
+
+    ./install.sh --profile core
+
+On Windows PowerShell, run the PowerShell installer:
+
+    .\install.ps1 -Profile core
+
+Both installers have the same contract. They read a profile, copy the right
+files to ~/.claude/, and write a state file recording what was installed.
+
+Profiles:
+
+  minimal -- Installs rules and agents only. Rules load on every turn; agents
+  are available on demand. No commands, no skills, no hooks. Use minimal when
+  you want Claude to follow conventions but do not need the slash command
+  shortcuts or the runtime hooks. Also the right choice for environments where
+  Node.js is not available (no hooks).
+
+  core -- Installs rules, agents, commands, and skills. This is the default and
+  the recommended starting profile for most developers. You get the full
+  day-to-day surface: /new-feature, /compose-review, /gradle-fix, and the
+  workflow recipes that back them. No hooks. Use core unless you specifically
+  want session persistence and the runtime safety checks.
+
+  full -- Installs everything in core, plus hooks and the scripts directory.
+  This adds the runtime layer: session context injection at startup, session
+  summary at the end of each turn, release build guard, ktlint advisory, and
+  manifest audit advisory. Use full when you want the safety net and are
+  comfortable with Node.js hooks running on every Claude Code session.
+
+Flags (these work on both install.sh and install.ps1):
+
+  --dry-run / -DryRun
+    Prints every file that would be copied without touching anything. Use this
+    before the first install to see what goes where.
+
+    Example:
+      ./install.sh --profile full --dry-run
+
+  --force / -Force
+    Overwrites files that already exist. Without this flag, existing files are
+    skipped. Use --force after pulling a kit update to push new versions of
+    rules and agents into place.
+
+    Example:
+      ./install.sh --profile core --force
+
+  --without-hooks / -WithoutHooks
+    Applies the full profile but skips copying hooks and scripts. Useful when
+    you want commands and skills but are not ready to run Node.js hooks.
+
+    Example:
+      ./install.sh --profile full --without-hooks
+
+  --uninstall / -Uninstall
+    Reads the state file and removes every file that was recorded as installed.
+    Does not remove directories. Does not remove files not listed in the state.
+    Safe to run multiple times.
+
+    Example:
+      ./install.sh --uninstall
+
+Example session for a first install on macOS:
+
+    git clone https://github.com/hashirhamxa/claude-android-kit.git ~/tools/claude-android-kit
+    cd ~/tools/claude-android-kit
+    ./install.sh --profile core --dry-run   # review
+    ./install.sh --profile core             # install
+
+2.3 Manual Install
+-------------------
+
+If you prefer to see exactly what goes where, or you are on a system where the
+installer script does not run cleanly, do it with cp commands.
+
+    git clone https://github.com/hashirhamxa/claude-android-kit.git
+    cd claude-android-kit
+
+    mkdir -p ~/.claude/agents ~/.claude/commands ~/.claude/skills
+    mkdir -p ~/.claude/rules/cak
+
+    # Everyone installs common + their primary stack
+    cp -r rules/common  ~/.claude/rules/cak/
+    cp -r rules/kotlin  ~/.claude/rules/cak/
+
+    # Android-only project
+    cp -r rules/android ~/.claude/rules/cak/
+
+    # KMP project (add android/ too if the KMP app has Compose UI on Android)
+    cp -r rules/kmp     ~/.claude/rules/cak/
+
+    cp    agents/*   ~/.claude/agents/
+    cp    commands/* ~/.claude/commands/
+    cp -r skills/*   ~/.claude/skills/
+
+The cak/ subdirectory under rules/ is intentional. It namespaces this kit so
+it coexists with other kits or rules you may already have in ~/.claude/rules/.
+
+A pure Android project needs: common/ + kotlin/ + android/
+A KMP project needs: common/ + kotlin/ + android/ + kmp/
+
+Templates stay in the cloned directory. Copy the right one into each new
+project as CLAUDE.md and fill in the placeholders.
+
+Manual install makes sense when you want to install only a subset of rules, or
+when you are on a restricted machine where running scripts requires extra
+approval. The manual approach gives you full visibility but does not write a
+state file, so the doctor/repair lifecycle tools will not work without one.
+
+2.4 Verifying the Install
+--------------------------
+
+Open Claude Code in any directory and ask:
+
+    What conventions do you apply to my Android/Kotlin work?
+
+You should see Claude summarize the kit's rules: Manual DI, Compose-only,
+StateFlow over LiveData, Clean Architecture plus MVVM, offline-first, the
+library choices, and so on. The summary should feel like a reflection of the
+kit's rules files, not generic advice.
+
+If Claude gives generic answers:
+
+1. Check that the rule files are where Claude Code looks:
+
+    ls ~/.claude/rules/cak/
+
+   You should see subdirectories: common/, kotlin/, android/, and/or kmp/.
+   If this is empty or missing, the copy step did not complete.
+
+2. Ask Claude to read a specific file:
+
+    What is in ~/.claude/rules/cak/android/android-architecture.md?
+
+   If Claude says it cannot access that file, your Claude Code setup is not
+   configured to auto-load the ~/.claude/ directory. Check Claude Code settings
+   for the rules loading configuration.
+
+3. Restart Claude Code. Some versions require a restart after new files are
+   added to ~/.claude/commands/ or ~/.claude/skills/.
+
+2.5 The State File
+-------------------
+
+Every automated install writes a state file at:
+
+    ~/.claude/.cak-install-state.json
+
+This file records the kit version, the profile chosen, the install timestamp,
+and the full list of every file that was copied. Example content:
+
+    {
+      "version": "0.2.0",
+      "profile": "core",
+      "installedAt": "2026-05-15T10:00:00Z",
+      "files": [
+        "/Users/you/.claude/rules/cak/common/git-workflow.md",
+        "/Users/you/.claude/rules/cak/android/android-architecture.md",
+        ...
+      ]
+    }
+
+The state file is what makes lifecycle commands safe. The doctor command checks
+each listed file and reports OK or MISSING. The repair command re-copies any
+MISSING files from the kit source. The uninstall command removes exactly the
+listed files, never guessing. Without the state file, none of these commands
+will run -- they exit with an error rather than guessing at what to touch.
+
+If you installed manually (via cp), the state file does not exist. You can
+still use the kit normally; you just cannot use doctor/repair/uninstall
+through the lifecycle CLI.
+
+Lifecycle commands (run from the kit root directory):
+
+    node scripts/cak.js doctor          # [OK] or [MISSING] for every managed file
+    node scripts/cak.js repair          # re-copies any missing files
+    node scripts/cak.js list-installed  # full list of CAK-managed files
+    node scripts/cak.js version         # print the kit version
+    node scripts/cak.js uninstall       # remove every recorded file
+
+2.6 Keeping the Kit Updated
+-----------------------------
+
+Pull new changes from the repository:
+
+    cd ~/tools/claude-android-kit   # wherever you cloned it
+    git pull
+
+Then re-run the installer with --force to push updated files into ~/.claude/:
+
+    ./install.sh --profile core --force
+
+The --force flag overwrites existing files without prompting. Without it, files
+that already exist are skipped even if the kit source is newer. Always use
+--force after a git pull.
+
+To uninstall the kit completely:
+
+    ./install.sh --uninstall
+
+Or via the lifecycle CLI:
+
+    node scripts/cak.js uninstall
+
+Both read the state file and remove only the listed files. After uninstall, the
+~/.claude/rules/cak/ directory may be empty. Remove it manually if you want:
+
+    rmdir ~/.claude/rules/cak
+
+
+================================================================================
+PART 3 -- HOW THE KIT WORKS
+================================================================================
+
+3.1 Layering Model
+-------------------
+
+The kit operates through three layers of context that override each other in
+a clear priority chain:
+
+    ~/.claude/rules/cak/     -- global, always on
+    <project>/CLAUDE.md      -- per-project, overrides global
+    current conversation     -- overrides everything for one task
+
+The global layer is this kit. Rules in ~/.claude/rules/cak/ load on every
+Claude Code turn, regardless of which directory you are in. They are the
+baseline that applies to all your projects.
+
+The per-project layer is a CLAUDE.md file in the project root. It can extend
+the global rules, add project-specific conventions, and explicitly override
+global rules that do not fit. When Claude Code opens a directory that has a
+CLAUDE.md, that file's instructions take precedence over the global rules
+wherever they conflict.
+
+The conversation layer is anything you say in the current session. If you tell
+Claude "for this task, use Hilt instead of AppContainer," Claude follows that
+instruction for the current task. The global rule is unchanged for next time.
+
+Concrete example: the global android-architecture.md rule says to use
+AppContainer and no Hilt. A legacy project has an existing Hilt graph that
+would cost more to migrate than it is worth. The project's CLAUDE.md contains:
+
+    ## DI override (overrides ~/.claude/rules/cak/android/android-architecture.md)
+    This project uses Hilt (inherited from v1). New DI follows Hilt conventions.
+    AppContainer guidance does not apply here.
+
+Claude reads both the global rule and the project override. The override wins.
+Claude uses Hilt in that project without you having to say so every session.
+
+3.2 Rules in Depth
+-------------------
+
+Rules are Markdown files. Claude Code reads them as context at the start of
+every turn. The content of each file is instruction-shaped text that tells
+Claude how to behave when it generates code in that domain.
+
+There are four packs. Install common/ and kotlin/ always. Install android/ for
+Android projects. Install kmp/ for KMP projects (plus android/ if the KMP app
+has Compose UI targets).
+
+---- common/ -- fires for every project regardless of stack ----
+
+common/git-workflow.md
+
+What it enforces: Conventional Commits format (feat/fix/refactor/etc with
+scope), branch naming conventions (feature/, fix/, chore/, spike/), small
+PRs with what/why/how descriptions, rebasing over merge commits, no
+commented-out code, no unowned TODOs, .gitignore hygiene including
+local.properties and google-services.json.
+
+When it fires: whenever Claude generates a commit message, creates a branch,
+or suggests git operations.
+
+Concrete example: without this rule, Claude might generate a commit message
+like "updated transaction repo." With this rule, it generates
+"feat(transactions): add offline queue for failed sync operations."
+
+common/productivity-anti-duplication.md
+
+What it enforces: grep before create (check that the thing you are about to
+build does not already exist), single source of truth for containers and
+themes, reuse over fork, no orphan files (wire new files in the same turn
+that creates them), a planning step before multi-file edits.
+
+When it fires: every time Claude is about to create a new file, class,
+function, or composable.
+
+Concrete example: without this rule, Claude might create a second
+TransactionRepository for a new screen. With this rule, it checks first and
+extends the existing one.
+
+common/security.md
+
+What it enforces: secrets never in source (no API keys in git, CI secrets
+via env vars only), Supabase row-level security on every table, Firebase
+rules locked before first client read, Ktor logging disabled in release,
+certificate pinning on production, dependency hygiene (monthly CVE checks),
+pre-release checklist.
+
+When it fires: every project, every session. This is the one pack that has
+no override condition.
+
+Concrete example: without this rule, Claude might scaffold Supabase table
+access without mentioning RLS. With this rule, it notes that RLS must be
+enabled and provides the pattern.
+
+common/testing.md
+
+What it enforces: coverage targets by layer (domain ~90%, data ~75%, view
+models ~70%), fakes over mocks, Turbine for Flow assertions, TDD for parsers
+and state machines, descriptive test names using backtick strings, what not
+to test (framework code, trivial getters, generated code).
+
+When it fires: whenever Claude writes code that contains logic, especially
+when it scaffolds a new layer.
+
+Concrete example: without this rule, Claude might write a view model test
+that uses mockk for the repository. With this rule, it creates a
+FakeRepository backed by a MutableSharedFlow.
+
+---- kotlin/ -- Kotlin language style ----
+
+kotlin/kotlin-style.md
+
+What it enforces: val over var, data classes for value types, immutable
+collections by default, no !! in production code, Result or sealed Outcome
+at module boundaries, structured concurrency (no GlobalScope), StateFlow
+for hot state, SharedFlow for events, cold Flow for repository streams,
+flowOn at repository boundary, no wildcard imports, 4-space indent, max 120
+chars, ktlint or detekt in every project.
+
+When it fires: every time Claude writes Kotlin, regardless of layer or
+stack. This is the language-level baseline.
+
+Concrete example: without this rule, Claude might write
+"val user = userDao.getUser()!!" to unwrap an optional result. With this
+rule, it uses requireNotNull or a safe-call chain with meaningful error.
+
+---- android/ -- Android-specific conventions ----
+
+android/android-architecture.md
+
+What it enforces: Manual DI via AppContainer (no Hilt, no Koin), Clean
+Architecture plus MVVM, feature-first package structure, UiState as a single
+immutable data class per view model, single-activity navigation with
+Compose Navigation and serializable routes, no Android framework types in
+view models, repository handles threading with flowOn.
+
+When it fires: starting a new project, adding a new feature, any
+architectural question.
+
+Concrete example: without this rule, Claude might scaffold a view model
+that takes Context as a constructor parameter. With this rule, it uses
+AppContainer to provide the database without exposing Android types.
+
+android/compose-patterns.md
+
+What it enforces: state hoisting, Route/Screen split (Route wires view
+model, Screen is stateless and previewable), collectAsStateWithLifecycle
+over collectAsState, single UiState data class per screen, LaunchedEffect
+keys that fully capture restart conditions, no lambdas capturing unstable
+state in hot paths, key = { it.id } on lazy lists, @Immutable or @Stable
+on custom types, no hardcoded Color() or sp values, every composable has a
+preview covering the interesting states.
+
+When it fires: any Compose code. This is the most frequently triggered rule
+in practice.
+
+Concrete example: without this rule, Claude might put local state in a leaf
+composable with "var selected by remember { mutableStateOf(false) }". With
+this rule, it hoists that state to the view model as part of UiState.
+
+android/security.md
+
+What it enforces: secrets through local.properties to BuildConfig (never
+hardcoded), no cleartext HTTP in networkSecurityConfig, EncryptedShared-
+Preferences for tokens and user IDs, Timber in debug builds only with
+CrashReportingTree in release, never logging PII or raw SMS content,
+manifest hardening (allowBackup false, usesCleartextTraffic false, exported
+explicit), minimum permissions, runtime permission requests in context.
+
+When it fires: any time Claude touches networking, auth, storage, or the
+manifest on Android.
+
+Concrete example: without this rule, Claude might store an access token in
+SharedPreferences. With this rule, it uses EncryptedSharedPreferences and
+notes the Keystore as an alternative for long-lived secrets.
+
+android/testing.md
+
+What it enforces: ViewModel state-transition tests using FakeRepository and
+Turbine, in-memory Room database for repository tests, Compose UI tests for
+critical flows only (not everything), snapshot tests (Paparazzi or
+Roborazzi) for visual regression on design-heavy screens, MockK only as a
+last resort.
+
+When it fires: Android-only features, Room migrations, high-value Compose
+screens.
+
+Concrete example: without this rule, Claude might write a repository test
+that mocks the DAO. With this rule, it uses an in-memory Room database and
+tests the actual DAO queries.
+
+---- kmp/ -- Kotlin Multiplatform conventions ----
+
+kmp/kmm-layering.md
+
+What it enforces: commonMain first (every new type starts in commonMain,
+moves to a platform source set only when a platform API is needed), expect/
+actual as last resort (prefer interface plus factory), SQLDelight over Room
+for KMP, Ktor with platform engines (OkHttp for Android, Darwin for iOS),
+three iOS targets (iosX64, iosArm64, iosSimulatorArm64), not sharing
+navigation, platform integrations, or lifecycle code.
+
+When it fires: KMP projects only. For pure Android, most of this file is
+inert.
+
+Concrete example: without this rule, Claude might add a file to androidMain
+thinking it is "shared." With this rule, it notes that androidMain is still
+platform-specific and the code should be in commonMain if it compiles
+without expect.
+
+kmp/security.md
+
+What it enforces: iOS-side KMP security -- no ATS exceptions in release,
+Keychain for sensitive storage on iOS, entitlements reviewed before each
+release.
+
+When it fires: any KMP app that ships an iOS target.
+
+kmp/testing.md
+
+What it enforces: commonTest for multiplatform behavior tests, androidTest
+for Android-specific integration, iosTest for iOS-specific integration,
+SQLDelight TestDriver for shared storage tests, Mockative for multiplatform
+mocking (MockK does not run on iOS).
+
+When it fires: KMP projects, shared module tests.
+
+3.3 Selective Installation
+---------------------------
+
+You do not have to install all four packs. The cost of installing a pack you
+do not need is small (Claude reads extra context) but real in long sessions.
+
+Recommended combinations:
+
+  Pure Android project: common/ + kotlin/ + android/
+  KMP project: common/ + kotlin/ + android/ + kmp/
+  Server-side Kotlin (no Android): common/ + kotlin/
+  Experimenting or minimal context: common/ only
+
+If you want to exclude a specific file within a pack, just delete it from
+~/.claude/rules/cak/ after install. The installer will not put it back unless
+you run with --force.
+
+
+================================================================================
+PART 4 -- AGENTS
+================================================================================
+
+Agents are named specialists. Each agent has a dedicated system prompt (its
+.md file in ~/.claude/agents/), a defined scope, and a set of tools it can
+use. Invoke agents explicitly with @agent-name in your prompt, or let commands
+dispatch to them automatically.
+
+Agents are not just different instruction sets. They are sub-personalities
+with focused expertise that produce structured, predictable output formats.
+When you invoke @gradle-resolver, you get a diagnosis with a specific shape --
+error category, root cause, fix, verify command -- not a general discussion.
+
+4.1 @android-architect
+-----------------------
+
+Model: Opus (the most capable reasoning model for hard decisions).
+Tools: Read, Grep, Glob, Bash.
+
+Scope: architectural decisions -- module layout, state design, library
+selection, trade-off analysis, feature shape design. This agent produces
+decisions, not implementations.
+
+When to invoke:
+- Before starting a non-trivial feature (ask for a shape check).
+- When evaluating a new dependency or library.
+- When stuck on a layering question ("should this go in domain or data?").
+- When the feature touches multiple systems (push notifications, sync,
+  background work) and you want trade-offs surfaced before writing code.
+
+What it will NOT do: write the full feature, review existing code line-by-line
+(that is @compose-reviewer or @kotlin-reviewer), make product decisions. If the
+request is ambiguous at the product level, it asks one clarifying question.
+
+Output shape:
+- Context: restates the problem in 1-3 sentences.
+- Decision: the chosen approach, stated plainly.
+- Why: bullet list of reasons, each with a concrete consequence.
+- Trade-offs: what this decision gives up, honest not hedged.
+- Implementation sketch: folder structure, key classes, data flow.
+- What to watch for: failure modes and things to revisit as the project grows.
+
+Example invocation:
+
+    @android-architect The app needs an offline queue for match invites when
+    the user has no signal. What is the shape?
+
+Claude will respond with a decision about queue storage (Room-backed), a sync
+trigger pattern (WorkManager), and a note about idempotency -- not a tutorial
+on WorkManager.
+
+The @android-architect agent also handles KMP architectural decisions. The
+knowledge base covers both pure Android and multiplatform shapes.
+
+4.2 @android-build-resolver
+-----------------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob, Bash.
+
+Scope: Android compile-time failures -- R8/ProGuard stripping a reflectively-
+used class, KSP or KAPT annotation processor conflicts, Compose Compiler to
+Kotlin version mismatches, version catalog alias collisions, and KMP
+expect/actual compile errors. This is distinct from Gradle script errors, which
+belong to @gradle-resolver.
+
+When to invoke: when assembleRelease, minifyRelease, or KSP/KAPT tasks fail.
+If the build fails before compilation starts (Gradle script error, missing
+plugin, daemon OOM), use @gradle-resolver instead.
+
+Decision rule: if the failing Gradle task produces .class-level output or
+processes annotation processors, this is @android-build-resolver. If the
+failure is in the Gradle evaluation phase or in ./gradlew itself, use
+@gradle-resolver.
+
+What it will NOT do: fix Gradle script syntax, diagnose daemon OOM, resolve
+manifest merger -- those are @gradle-resolver territory.
+
+Output shape:
+- Error category: R8/ProGuard, KSP, KAPT, Compose Compiler compatibility,
+  AGP conflict, version catalog, expect/actual, or other.
+- Root cause: plain English, one paragraph.
+- Fix: exact changes with file paths, diffs, version numbers, keep rules.
+- Why this works: ties back to the root cause.
+- Verify: command to confirm the fix.
+- Prevent next time: one-line guardrail.
+
+Example invocation:
+
+    @android-build-resolver The release build is failing with "Missing class
+    com.example.data.remote.dto.UserResponse" after enabling R8.
+
+The agent will locate the R8 mapping file, determine whether the class was
+renamed or removed, and produce the specific -keep rule for that DTO class.
+
+4.3 @android-security-reviewer
+--------------------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob (read-only, never Bash).
+
+Scope: Android-specific security surfaces -- Manifest component exposure,
+network security config, secrets hygiene, storage choices, token handling,
+ProGuard source retention, and dependency hygiene. General Kotlin-level
+security issues (raw SQL, insecure deserialization) are governed by the common
+security rule, not this agent.
+
+When to invoke: before merging any PR that touches auth, storage, networking,
+or the manifest. Good habit before every release branch cut. The agent is
+fast and read-only -- it costs nothing to run it.
+
+What it will NOT do: modify files, attempt fixes, review pure UI code, or
+handle general Kotlin security concerns outside Android surfaces.
+
+Output shape:
+- Files reviewed: paths.
+- Summary: one sentence verdict.
+- Blocking: must-fix before release. Numbered, each with file:line, the
+  specific vulnerability, and the concrete remediation.
+- Risk: should be addressed or explicitly deferred with written rationale.
+- Out of scope: files outside Android security concerns.
+
+The agent applies a structured checklist on every invocation: AndroidManifest
+(exported components, debuggable attribute, backup rules), network security
+config (cleartext, pinning, trust anchors), secrets hygiene (no keys in gradle
+or BuildConfig), storage (EncryptedSharedPreferences vs plain, external
+storage), token handling (KeyStore vs SharedPreferences), ProGuard security
+(no SourceFile attribute in release, no -dontobfuscate), and dependency hygiene.
+
+Example invocation:
+
+    @android-security-reviewer review the auth module changes before this PR
+    merges to main
+
+4.4 @compose-reviewer
+-----------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob (read-only).
+
+Scope: Jetpack Compose and Compose Multiplatform code review -- state
+management, recomposition hot paths, side effect discipline, modifier order,
+previews, accessibility, and UDF conformance.
+
+When to invoke: before opening a PR with UI changes, or whenever a Compose
+screen feels wrong and you want a checklist applied systematically.
+
+What it will NOT do: review data or domain layer code (defer those to
+@kotlin-reviewer), rewrite files itself (it suggests fixes; you apply them).
+
+Output shape:
+- Files reviewed: paths.
+- Summary: one sentence verdict ("Ship it." / "Needs changes." / "Has issues").
+- Blocking: numbered, each with file:line, the problem, and the fix.
+- Non-blocking: nits prefixed with "nit:".
+- Good: patterns worth calling out positively.
+
+The agent checks: state hoisting, Route/Screen split, collectAsStateWithLife-
+cycle, single UiState, events as lambdas, LaunchedEffect keys, no suspend in
+composition, DisposableEffect for cleanup, recomposition hygiene (unstable
+lambdas, list keys, @Immutable), modifier order, theme (no hardcoded colors),
+previews covering interesting states, accessibility, and KMP concerns
+(no Android-only APIs in commonMain composables).
+
+Example invocation:
+
+    @compose-reviewer app/src/main/.../ui/transactions/TransactionListScreen.kt
+
+Or use the slash command shortcut:
+
+    /compose-review app/src/main/.../ui/transactions/
+
+4.5 @gradle-resolver
+---------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob, Bash.
+
+Scope: Gradle script errors, AGP version mismatches, Kotlin version conflicts,
+Compose Compiler pairing, KSP version mismatches, dependency resolution
+failures, manifest merger, Gradle daemon OOM. This agent knows the version
+compatibility matrix for AGP/Gradle/Kotlin/Compose/KSP.
+
+When to invoke: any build failure at the Gradle script level. If the failing
+task is ./gradlew itself, or if the error is in build script evaluation, this
+is the right agent.
+
+What it will NOT do: fix R8 keep rules, diagnose KSP annotation processor
+output, or handle KMP expect/actual compile errors -- those are
+@android-build-resolver territory.
+
+Output shape: same structure as @android-build-resolver (error category, root
+cause, fix, why it works, verify, prevent next time).
+
+The most common categories this agent handles:
+
+  Version conflict: plugin not found, AGP-Gradle mismatch.
+  Compose Compiler mismatch: Kotlin and Compose Compiler incompatibility.
+  KSP mismatch: KSP version prefix does not match Kotlin version.
+  Duplicate class: transitive dependency conflict.
+  Manifest merger: conflicting attributes from two libraries.
+  Gradle daemon OOM: insufficient heap in gradle.properties.
+
+Example invocation:
+
+    @gradle-resolver The build is failing with "This version of the Compose
+    Compiler requires Kotlin 1.9.22 but we just bumped to Kotlin 2.0.0"
+
+Or use the slash command:
+
+    /gradle-fix
+
+4.6 @kmp-migration-planner
+----------------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob (read-only).
+
+Scope: moving code between commonMain, androidMain, and iosMain source sets.
+Analyzes platform dependencies, suggests expect/actual versus interface-based
+splits, and produces step-by-step migration plans.
+
+Three common situations that trigger this agent:
+1. Sharing Android-only code to KMP ("move TransactionRepository to
+   commonMain").
+2. Splitting an expect class that grew too large.
+3. Diagnosing "why does this compile on Android but not iOS."
+
+What it will NOT do: write migration code directly (it produces the plan and
+the steps; the engineer or Claude Code implements them), make Gradle
+configuration changes (coordinate with @gradle-resolver if needed).
+
+Output shape:
+- Current state: file paths, source sets, dependencies found.
+- Target state: where the code should end up.
+- Platform dependency audit: every non-multiplatform dependency with its
+  replacement strategy.
+- Migration steps: numbered, each small enough to compile and test
+  independently.
+- Risks: what could break, specifically iOS since it often silently fails.
+
+The agent applies a dependency categorization table: kotlinx.* libraries stay
+in commonMain, android.content.Context needs an expect or interface, Log maps
+to Napier, Room maps to SQLDelight, OkHttp maps to Ktor, DataStore maps to
+multiplatform-settings, java.util.Date maps to kotlinx-datetime, and so on.
+
+For every dependency in the target code, the agent classifies it and provides
+the replacement strategy. The migration steps follow the standard pattern:
+audit, stub in commonMain, introduce expects one at a time, Android actual
+first, iOS actual second, write commonTest, delete the original, wire into
+container.
+
+Example invocation:
+
+    @kmp-migration-planner I want to share CurrencyFormatter from the Android
+    app into the shared module's commonMain. It currently uses
+    java.text.NumberFormat and Locale.
+
+4.7 @kotlin-reviewer
+---------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob (read-only).
+
+Scope: non-UI Kotlin code review -- repositories, use cases, mappers, DTOs,
+domain models, AppContainer wiring, coroutine scopes. For composable files,
+use @compose-reviewer.
+
+When to invoke: any data or domain layer diff. Pair with @compose-reviewer for
+full-stack PR review on a feature that touches both UI and data.
+
+What it will NOT do: review composables or UI code (defer to @compose-reviewer),
+attempt fixes (it recommends; you apply).
+
+Output shape: same structure as @compose-reviewer (files, summary, blocking,
+non-blocking, good patterns).
+
+Checklist: nullability (no !!, ?.let nesting), coroutines (no GlobalScope,
+CancellationException not swallowed, proper operators), domain and architecture
+(pure domain models, sealed results at boundaries, no pass-through use cases),
+Manual DI (constructor injection only, no object with state, every new class in
+AppContainer), repository contract (Flow for streams, suspend for one-shot,
+DAOs internal, network errors mapped to domain errors), mapper discipline (one
+mapper per boundary, pure functions, no raw DTOs in UiState).
+
+Example invocation:
+
+    @kotlin-reviewer shared/src/commonMain/.../data/repository/BookRepository.kt
+
+4.8 @room-migration-planner
+-----------------------------
+
+Model: Sonnet.
+Tools: Read, Grep, Glob (read-only).
+
+Scope: Room database migrations -- reads the schema export JSON diff,
+determines whether AutoMigration applies or a manual Migration class is needed,
+generates the migration with correct SQLite DDL, and writes the
+MigrationTestHelper test.
+
+When to invoke: any @Entity change that requires a database version increment.
+
+What it will NOT do: make architectural decisions about the schema itself (that
+is @android-architect), modify Gradle configuration.
+
+Output shape:
+- Schema diff summary: what changed between old and new entity.
+- AutoMigration or manual: which applies and why.
+- Migration class: full Kotlin Migration(from, to) object with SQLite DDL.
+- Schema export note: which file in schemas/ will be regenerated and what to
+  verify.
+- Migration test: full MigrationTestHelper test including a data assertion.
+- Register in database: the one-line change to addMigrations(...).
+
+AutoMigration covers: adding nullable or defaulted columns, adding tables,
+renaming tables (@RenameTable), renaming columns (@RenameColumn), dropping
+columns (@DeleteColumn), dropping tables (@DeleteTable).
+
+Manual Migration is required for: changing a column's type affinity, merging
+or splitting tables, modifying a primary key, any change AutoMigration reports
+it cannot handle.
+
+For column renames and type changes, the agent generates the create-copy-drop
+pattern: create a new table with the target schema, copy data (with type
+conversion if needed), drop the original, rename the new table, recreate
+indexes.
+
+The agent flags fallbackToDestructiveMigration() as never acceptable in a
+release build, and flags exportSchema = false as a red flag that disables
+MigrationTestHelper.
+
+Example invocation:
+
+    @room-migration-planner I added a createdAt: Long column to UserEntity and
+    bumped the DB version from 3 to 4.
+
+4.9 Agent Interaction Patterns
+--------------------------------
+
+Agents hand off to each other through commands and through your explicit
+direction.
+
+Implicit handoffs through commands:
+
+  /new-android and /new-kmm check in briefly with @android-architect before
+  scaffolding. The architect asks about unusual requirements and flags any
+  decisions that should be made before code is written.
+
+  /new-feature delegates to @android-architect for a shape check on non-trivial
+  features, then runs the scaffolder.
+
+  /compose-review delegates entirely to @compose-reviewer.
+
+  /gradle-fix delegates to @gradle-resolver.
+
+Explicit handoffs for the four newer specialists:
+
+  @android-build-resolver -- invoke directly when assembleRelease or KSP tasks
+  fail at compile time.
+
+  @android-security-reviewer -- invoke before any PR touching auth, storage,
+  networking, or manifest. No command dispatches here automatically.
+
+  @kotlin-reviewer -- invoke on data or domain layer diffs. Pair with
+  @compose-reviewer for full-stack review.
+
+  @room-migration-planner -- invoke whenever an @Entity change requires a DB
+  version bump. No command dispatches here automatically.
+
+Example multi-agent workflow for a release PR:
+
+    1. /compose-review ui/transactions/       -- review all UI
+    2. @kotlin-reviewer data/repository/      -- review data layer
+    3. @android-security-reviewer             -- security audit before merge
+    4. /gradle-fix                            -- verify release build passes
+
+Example workflow for a new KMP feature involving push:
+
+    1. @android-architect -- shape check (architect flags that push is platform-
+       specific and suggests PushSender interface in commonMain)
+    2. /new-feature match-invite              -- scaffold
+    3. @kmp-migration-planner                -- if any code needs to move
+       between source sets
+    4. @compose-reviewer                     -- review the UI slice
+    5. @kotlin-reviewer                      -- review the shared data slice
+
+
+================================================================================
+PART 5 -- COMMANDS
+================================================================================
+
+Commands live in ~/.claude/commands/*.md. Each command is a mini-prompt that
+configures Claude for a specific task. Commands are invoked with a /slash
+prefix and can accept arguments.
+
+5.1 /new-android
+-----------------
+
+Syntax: /new-android <app-name> [package-name]
+
+What it does: bootstraps a pure Android project from scratch. Produces a
+working scaffold that builds immediately: libs.versions.toml with current-
+stable versions, root and app build.gradle.kts, AppContainer skeleton with
+Room and Ktor wired, MainActivity with a Home screen demonstrating the
+Route/Screen pattern, Material 3 theme with dynamic color on Android 12+,
+CLAUDE.md filled from the Android template, .gitignore, and
+local.properties.example.
+
+The command delegates briefly to @android-architect before scaffolding to
+confirm the architectural shape and flag anything unusual. After scaffolding,
+it prints the suggested initial commits.
+
+Arguments:
+  <app-name> -- Display name and module name. Required.
+  [package-name] -- Java package. Optional. Defaults to com.hash.<lowercase>.
+
+Before scaffolding, the command asks a small set of questions if not inferable
+from the arguments: target min SDK (default 24), Firebase (default: scaffolded
+but disabled until google-services.json is added), Supabase (default: yes with
+placeholder BuildConfig fields), any specific feature beyond home screen
+(default: no).
+
+When to use it: day one of any new Android-only app.
+
+When NOT to use it: existing projects. It scaffolds from scratch and will not
+migrate an existing codebase. For adding conventions to an existing project,
+copy the Android template manually as CLAUDE.md.
+
+Example session:
+
+    /new-android TamaamPaisa com.hash.tamaampaisa
+    > (Claude asks: min SDK? Firebase? Supabase?)
+    > You: 24, yes to both
+    > (Scaffold generates. Claude prints build verification command.)
+    ./gradlew assembleDebug
+    > BUILD SUCCESSFUL
+
+5.2 /new-kmm
+-------------
+
+Syntax: /new-kmm <app-name> [package-name]
+
+What it does: same as /new-android but for Kotlin Multiplatform. Produces:
+  - shared/ module with commonMain/androidMain/iosMain source sets.
+  - composeApp/ module with Compose Multiplatform for Android and iOS.
+  - iosApp/ Xcode project with a SwiftUI shell bridging to the Compose
+    UIViewController.
+  - AppContainer as expect class with two actual implementations.
+  - SQLDelight configured in commonMain.
+  - Ktor with OkHttp engine in androidMain and Darwin engine in iosMain.
+  - CLAUDE.md filled from the KMP template.
+
+The command delegates to @android-architect to confirm targets (default:
+Android + iOS), UI approach (default: Compose Multiplatform), and backend.
+
+Before scaffolding, the command asks: targets beyond Android + iOS (desktop,
+web -- default: no), Compose Multiplatform or native iOS UI (default: CMP),
+backend (Firebase, Supabase, or custom).
+
+When to use it: day one of any new KMP app.
+
+When NOT to use it: existing Android apps where you want to add KMP. That is a
+migration, not a bootstrap. Use @kmp-migration-planner for that.
+
+Expected quirk: the first iOS framework build (./gradlew :shared:link-
+DebugFrameworkIosSimulatorArm64) takes several minutes on first run because
+Kotlin/Native compilation is not incremental on first run. This is normal.
+
+Example session:
+
+    /new-kmm Maidan com.hash.maidan
+    > (Claude delegates to @android-architect: targets? UI approach? backend?)
+    > You: Android + iOS only, CMP, Supabase
+    > (Scaffold generates.)
+    ./gradlew :composeApp:assembleDebug           # must succeed
+    ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64  # must succeed
+    open iosApp/iosApp.xcodeproj                  # open in Xcode
+
+5.3 /new-feature
+-----------------
+
+Syntax: /new-feature <feature-name>
+
+What it does: scaffolds a full vertical slice in an existing project. Works in
+both pure Android and KMP (detects which by looking at the module structure).
+Produces all layers in one pass: domain model, repository interface, use case
+(if there is real business logic -- skipped if it would be a pass-through),
+Room entity and DAO (Android) or SQLDelight .sq file (KMP), Ktor API and DTO
+and mapper, default repository implementation with flowOn, UiState, view model,
+Route composable, Screen composable, nav route wired into AppNavHost, wired
+into AppContainer, tests (ViewModel with FakeRepository, Repository with
+in-memory DB, Mappers).
+
+Before scaffolding, the command asks exactly two questions:
+  1. What does the feature do in one sentence?
+  2. Is it primarily list-based, detail-based, or form-based?
+
+The command delegates to @android-architect for a brief shape check. This
+catches things like "this touches push notifications which is platform-specific
+-- design a PushSender interface in commonMain first."
+
+Feature name uses hyphen-case. Claude converts to PascalCase for types,
+camelCase for variables, lowercase for the folder.
+
+After scaffolding, the tests should compile and pass without modification.
+
+When to use it: any new feature bigger than adding a button to an existing
+screen.
+
+When NOT to use it: small additions, bug fixes, single-file changes. The
+scaffolding overhead is not worth it for a two-line change.
+
+Example session:
+
+    /new-feature booking
+    > What does it do? "Lets users book turf slots and see their bookings."
+    > List, detail, or form? "List with a booking form."
+    > (Architect shape check fires.)
+    > (Scaffold generates 15 files across ui/booking/, domain/, data/.)
+    ./gradlew :app:testDebugUnitTest --tests *Booking*
+    > BUILD SUCCESSFUL -- 6 tests ran
+
+5.4 /compose-review
+--------------------
+
+Syntax: /compose-review <file-or-folder>
+
+What it does: resolves the argument to one or more Kotlin files containing
+@Composable functions, reads them, and delegates to @compose-reviewer. Returns
+the agent's review verbatim, prefixed with the resolved file list.
+
+If the argument is a folder, it reviews every .kt file with @Composable
+functions in that folder. If the argument is a feature name (no slashes, no
+.kt extension), it resolves to ui/<name>/ under the main source set.
+
+After the review, if there are blocking issues, the command offers to apply
+specific fixes you select, open files at the blocking issue line numbers, or
+re-run the review after fixes.
+
+The command is read-only. It does not modify any files during the review pass.
+
+When to use it: before opening a PR with UI changes, or when a screen feels
+structurally wrong and you want a checklist applied.
+
+When NOT to use it: for reviewing data or domain layer code (use @kotlin-
+reviewer directly), for reviewing non-Compose code.
+
+5.5 /gradle-fix
+----------------
+
+Syntax: /gradle-fix [command-or-log]
+
+Three modes:
+
+  /gradle-fix (no args) -- re-runs the last failing Gradle command from
+  conversation history. If none found, asks you to paste the error or provide
+  a command.
+
+  /gradle-fix "./gradlew assembleDebug" -- runs the specified command with
+  --stacktrace appended if not present, and diagnoses on failure.
+
+  /gradle-fix paste -- waits for you to paste the full error log, then
+  diagnoses without running a command.
+
+After capturing the error, the command reads the relevant build files
+(libs.versions.toml, root and app build.gradle.kts, shared/build.gradle.kts if
+KMP, gradle.properties, wrapper properties), then delegates to @gradle-resolver.
+
+If the fix is a single file edit or version bump, the command offers to apply
+it directly. It always shows the diff before editing libs.versions.toml. After
+applying, it re-runs the original command to verify. It loops up to 3 times.
+If three iterations do not fix it, it stops and summarizes what was tried,
+then suggests a Build Scan (--scan flag) and escalation options.
+
+The command never bumps major versions (AGP 7 to 8, Kotlin 1.9 to 2.0) without
+flagging it as a migration and asking first.
+
+When to use it: any build failure. Do not try to diagnose yourself first.
+
+When NOT to use it: for compile-time failures that happen after Gradle
+evaluation (R8, KSP processor output, expect/actual). For those, use
+@android-build-resolver directly.
+
+5.6 /audit-kit
+---------------
+
+Syntax: /audit-kit [optional focus area]
+
+What it does: audits the kit itself for documentation drift and packaging
+hygiene. It is meta -- it checks whether the kit is self-consistent.
+
+Specifically:
+  1. Counts actual rule files, agent files, command files, SKILL.md files,
+     and template files.
+  2. Compares those counts with what README.md and GUIDE.md claim.
+  3. For every command file, verifies it is mentioned where appropriate in docs.
+  4. For every rule file, verifies the guide's rule inventory includes it.
+  5. Runs git status --porcelain and flags untracked or deleted files inside
+     rules/, agents/, commands/, skills/, or templates/.
+  6. Reports stale names and empty directories.
+
+The command reports only. It does not modify anything during the audit. After
+reporting, it produces a short checklist of suggested edits.
+
+When to use it: before publishing the kit, after restructuring the kit (moving
+files between directories, renaming agents), or before cutting a release that
+changes the kit layout. Run it after any structural change to catch drift
+before others rely on the docs.
+
+5.7 /ui-from-image
+-------------------
+
+Syntax: /ui-from-image [figma URL | stitch URL | image path | description]
+
+What it does: converts a visual reference into pixel-faithful Compose or
+Compose Multiplatform code. Detects whether the project is Android-only or KMP.
+Loads the ui-from-image skill and follows its 8-phase workflow.
+
+The 8 phases are:
+  1. Detect inputs (Figma, Stitch, screenshot, or description).
+  2. Detect target (Jetpack Compose vs Compose Multiplatform) and discover
+     project conventions by reading CLAUDE.md, THEME.md, existing theme files.
+  3. Extract the design (via Figma MCP, Stitch MCP, or vision analysis).
+  4. Inventory the design system -- scan existing Color.kt, Type.kt, Dimens.kt,
+     and existing components. Apply strict priority: user instructions, then
+     convention docs, then existing theme files, then skill defaults.
+  5. Plan the composable tree before writing code.
+  6. Resolve assets -- list every icon, image, and font needed; ask the user
+     how to handle each (provide files, MCP export, Material substitution, or
+     placeholder).
+  7. Generate code following the project's existing structure.
+  8. Self-verify against the source using a 12-item checklist.
+
+The command enforces that existing theme tokens are never silently overridden.
+If the design's colors conflict with the project's Color.kt, the command asks
+before changing anything.
+
+When to use it: when you have a visual reference (Figma frame, Stitch link,
+screenshot, or mockup image) and want Claude to recreate it in Compose.
+
+When NOT to use it: generic UI implementation with no visual reference (just
+describe what you want and Claude writes Compose normally), or review work on
+existing screens.
+
+
+================================================================================
+PART 6 -- SKILLS
+================================================================================
+
+Skills live in ~/.claude/skills/<name>/SKILL.md. They are detailed recipes with
+decision trees, file-by-file instructions, and code templates. Skills are deeper
+than commands -- they carry the full procedure that a command invokes.
+
+Claude activates a skill when its frontmatter description matches the task at
+hand. You do not usually invoke skills directly. They back up commands or
+surface when your prompt semantically matches the skill's description.
+
+You can force-activate a skill by naming it in your prompt:
+
+    Use the feature-vertical-slice skill to add a profile screen.
+
+6.1 new-project-android
+------------------------
+
+What workflow it encodes: the full end-to-end recipe for bootstrapping a pure
+Android project. This is what /new-android uses internally.
+
+When Claude invokes it automatically: when you run /new-android, or when you
+describe wanting to start a new Android project from scratch.
+
+Step-by-step what the skill does:
+
+  1. Gather inputs: app name, package name, min SDK.
+  2. Look up current stable versions via web search: AGP (and its Gradle
+     requirement), Kotlin, Compose BOM, Ktor, Room. Never hardcodes versions.
+  3. Create root files: build.gradle.kts, settings.gradle.kts (with plugin
+     management and dependency resolution management), gradle.properties (with
+     JVM args, AndroidX flag, Kotlin code style).
+  4. Create libs.versions.toml with all versions in [versions], libraries in
+     [libraries], plugins in [plugins].
+  5. Create app/build.gradle.kts with namespace, compileSdk, defaultConfig
+     (including BuildConfig fields from local.properties), buildFeatures
+     (compose = true, buildConfig = true), R8 on release.
+  6. Create App.kt with AppContainer initialization.
+  7. Create di/AppContainer.kt with the interface and DefaultAppContainer
+     providing the Room database and Ktor HttpClient.
+  8. Create an empty AppDatabase with exportSchema = true.
+  9. Create theme, MainActivity, AppNavHost, and one HomeScreen composable.
+  10. Copy templates/CLAUDE.android.template.md to project root as CLAUDE.md
+      with placeholders filled.
+  11. Create local.properties.example with sdk.dir and secret placeholders.
+  12. Run ./gradlew assembleDebug to verify. If it fails, invoke @gradle-
+      resolver.
+  13. Create initial commit.
+
+Good output: a directory that builds green with ./gradlew assembleDebug and
+shows a Material 3 home screen on an emulator.
+
+Common failure modes and recovery:
+  - Version mismatch on first build: the skill says to use @gradle-resolver.
+    Do not try to fix manually.
+  - Missing web search for versions: the skill explicitly requires a web_search
+    to verify current stable versions. If this step was skipped, the versions
+    in libs.versions.toml may be outdated.
+  - Generated CLAUDE.md has unfilled placeholders: the skill fills them, but
+    if Claude skipped the fill step, open CLAUDE.md and replace the {{}}
+    markers manually.
+
+6.2 new-project-kmm
+--------------------
+
+What workflow it encodes: end-to-end recipe for a KMP project with Android and
+iOS targets and Compose Multiplatform UI. Includes Xcode project setup.
+
+When Claude invokes it automatically: when you run /new-kmm, or when you ask
+for a new KMP or KMM project.
+
+Step-by-step what the skill does:
+
+  1. Gather inputs: app name, package, targets (default: Android + iOS),
+     backend choice.
+  2. Verify current versions: Kotlin, Compose Multiplatform, Ktor, SQLDelight,
+     AGP, Xcode compatibility.
+  3. Create root files: settings.gradle.kts including both :shared and
+     :composeApp, gradle.properties with kotlin.mpp.applyDefaultHierarchyTemplate.
+  4. Create libs.versions.toml with multiplatform-specific libraries (CMP,
+     Ktor platform engines, SQLDelight drivers, kotlinx-datetime, Napier).
+  5. Create shared/build.gradle.kts with kotlin("multiplatform"), all three
+     iOS targets, commonMain/androidMain/iosMain dependencies, SQLDelight
+     configuration.
+  6. Create AppContainer expect class in commonMain, Android actual using
+     AndroidSqliteDriver and OkHttp engine, iOS actual using NativeSqliteDriver
+     and Darwin engine.
+  7. Create composeApp/build.gradle.kts with Compose Multiplatform plugin.
+  8. Create app entry points: App.kt in commonMain, MainActivity in androidMain,
+     MainViewController in iosMain.
+  9. Create iosApp/ Xcode project with SwiftUI bridge and Build Phase script
+     that runs embedAndSignAppleFrameworkForXcode before Compile Sources.
+  10. Fill CLAUDE.md from KMP template.
+  11. Create .gitignore with Android, Kotlin, and Xcode patterns.
+  12. Run both verification commands: assembleDebug and linkDebugFramework-
+      IosSimulatorArm64.
+  13. Initial commit.
+
+Good output: two green builds (Android and iOS framework) and an Xcode project
+that opens and runs on a simulator.
+
+Common failure modes and recovery:
+  - Xcode "framework not found": the Build Phase script did not run before
+    Compile Sources. Verify it is in Xcode Build Phases before Compile Sources.
+  - Slow iOS build: expected on first run. Kotlin/Native is not incremental
+    initially.
+  - commonMain cannot resolve Ktor: Ktor version incompatible with Kotlin.
+    Use @gradle-resolver.
+
+6.3 feature-vertical-slice
+---------------------------
+
+What workflow it encodes: the full recipe for adding a feature as a vertical
+slice through all layers. This is what /new-feature uses internally.
+
+When Claude invokes it automatically: when you run /new-feature, or when you
+ask to add a feature to an existing project.
+
+The skill has a decision tree before scaffolding:
+
+  - Does this feature touch the network, local DB, both, or neither?
+    (Determines which data files to create.)
+  - Is there a business rule beyond CRUD?
+    (If yes, create a use case. If no, skip the use case layer.)
+  - Is this a list, detail, or form?
+    (Determines the starting UI shape.)
+  - Does it share data with existing features?
+    (If yes, reuse models; do not copy.)
+
+File creation order (domain -> repository interface -> use case if needed ->
+data local -> data remote if applicable -> mappers -> repository implementation
+-> AppContainer wiring -> UI layer (UiState, ViewModel, Route, Screen) ->
+navigation -> tests -> DB migration if schema changed).
+
+Good output: all files compile, all tests pass, the feature is wired into
+AppContainer and reachable via navigation, and there is at least one happy-path
+flow that works end-to-end with fake data.
+
+Common failure modes and recovery:
+  - Test compilation fails: usually a missing FakeRepository. The skill
+    specifies creating fakes, not mocks. If Claude used mockk, ask it to
+    replace with a fake.
+  - Navigation not wired: the skill says to add the route to AppNavHost in the
+    same turn. If Claude skipped this, ask it to complete the wiring.
+  - Use case created for a pass-through: the skill says to skip use cases that
+    only forward to the repository. Ask Claude to remove it.
+
+6.4 gradle-troubleshooting
+---------------------------
+
+What workflow it encodes: the deterministic diagnostic sequence for broken
+builds. This skill is explicitly not a fix-it-yourself flowchart -- it
+structures the diagnosis and points to @gradle-resolver for the actual fix.
+
+When Claude invokes it automatically: when /gradle-fix fires, or when you
+describe a build issue.
+
+The skill runs through a standard sequence:
+
+  1. Read the full error, not just the last line. Look for "Caused by:" and
+     the specific failing task.
+  2. Check the version matrix: AGP/Gradle, AGP/compileSdk, Kotlin/Compose
+     Compiler, Kotlin/KSP, KMP/Xcode.
+  3. Try clean plus invalidate: ./gradlew --stop, rm -rf .gradle/ build/,
+     ./gradlew clean.
+  4. Get more signal with --stacktrace, --info, or --scan.
+  5. Run dependency insight for "duplicate class" or "cannot find" errors.
+
+The skill has a category reference covering: version conflict, Compose Compiler
+mismatch, KSP version mismatch, duplicate class, manifest merger failure, R8
+missing classes, KMP iOS framework not found, commonMain compilation fails on
+Android-only API, Gradle daemon OOM, lint blocking release.
+
+Good output: identified category, root cause, applied fix, build green.
+
+Common failure modes and recovery:
+  - Skill activates but build is still broken after the standard sequence:
+    escalate to Build Scan (./gradlew <task> --scan) and share the URL.
+  - Category not covered by the skill's reference: search GitHub issues for the
+    exact error message and check upstream library issues.
+
+6.5 ui-from-image
+------------------
+
+What workflow it encodes: the 8-phase visual fidelity workflow for generating
+Compose or Compose Multiplatform UI from Figma, Stitch, or screenshot inputs.
+
+When Claude invokes it automatically: when you run /ui-from-image, or when you
+provide a visual reference (Figma link, screenshot, mockup) with intent to
+build UI.
+
+The skill enforces a strict priority order for design tokens: explicit
+instructions from the user win, then convention docs (CLAUDE.md, THEME.md),
+then existing theme files (Color.kt, Type.kt), then skill defaults. Existing
+tokens are never silently overridden.
+
+The asset resolution step is mandatory. The skill requires building an explicit
+manifest of every icon, image, and font needed before writing code, then asking
+the user how to handle each one. No invented drawable references are permitted.
+
+Good output: generated Compose code that passes the skill's 12-item self-
+verification checklist, an asset summary noting what was provided/substituted/
+placeholdered, and a TODO list of follow-ups.
+
+Common failure modes and recovery:
+  - Generated code references a drawable that does not exist: the skill
+    prohibits this. If Claude wrote a broken reference, ask it to replace with
+    a Material Icon substitution or an AssetPlaceholder call.
+  - Theme conflict not surfaced: the skill requires stopping and asking before
+    overriding an existing token. If Claude silently changed Color.kt, revert
+    and ask it to follow the decision tree.
+  - Composable tree not planned before code: the skill requires writing the
+    hierarchy before generating code. If the output structure feels wrong, ask
+    Claude to write the tree first and re-generate.
+
+
+================================================================================
+PART 7 -- HOOKS
+================================================================================
+
+7.1 Overview
+-------------
+
+Hooks are the runtime layer. Rules shape every response as context. Hooks react
+to concrete Claude Code events: session lifecycle, tool use, and tool
+completion. They run Node.js scripts outside the conversation.
+
+Hooks require Node.js and are installed only with the full profile. They live
+in hooks/hooks.json (the event wiring) and scripts/hooks/ (the implementations)
+and scripts/lib/utils.js (shared utilities).
+
+There are 5 hook entries in v0.2.0. They map to 4 Claude Code event types:
+SessionStart, PreToolUse, PostToolUse, and Stop.
+
+7.2 Session Persistence Hooks (cak:session-start / cak:session-end)
+---------------------------------------------------------------------
+
+cak:session-start
+
+  Event: SessionStart (fires when Claude Code begins a new session).
+  Blocking: no. If this hook fails, the session continues normally.
+  Profiles: minimal, standard, strict.
+
+  What it does: looks for .claude-android-kit-state/last-session.md in the
+  current working directory. If found, injects its contents into the startup
+  context up to a configurable character limit. This carries over the previous
+  session's summary -- what was being worked on, what files were touched, what
+  was left unfinished -- without requiring you to re-explain it each time.
+
+  The file is written by cak:session-end. Its content is a small repo-local
+  summary, not a full conversation transcript.
+
+cak:session-end
+
+  Event: Stop (fires when Claude Code produces its final response for a turn).
+  Blocking: no.
+  Profiles: minimal, standard, strict.
+
+  What it does: overwrites .claude-android-kit-state/last-session.md with a
+  fresh summary including timestamp, current working directory, project name
+  (from CLAUDE.md if present), and the current git branch. This file is repo-
+  local (inside the project directory, not ~/.claude/), so it is specific to
+  the project you are working in.
+
+Together these two hooks create a lightweight persistence mechanism. Start a
+session in a project, work for an hour, close Claude Code. Next day, open
+Claude Code in the same project -- the session-start hook loads the summary
+and Claude remembers what was in progress.
+
+7.3 ktlint Advisory Hook (cak:kt-lint)
+----------------------------------------
+
+  Event: PostToolUse on Edit or Write tool calls.
+  Blocking: no. Warns on stderr; the turn continues.
+  Profiles: standard, strict (not in minimal).
+
+  What it does: after any Edit or Write call, the script-side filter checks
+  whether the edited file has a .kt extension. If it does, the hook finds the
+  nearest Gradle wrapper and runs ktlintCheck on the file. If ktlint reports
+  violations, it warns on stderr with the specific issues.
+
+  This hook is advisory, not blocking. It catches style violations immediately
+  after they are introduced, before they accumulate into a noisy linting
+  session later.
+
+7.4 Manifest Audit Hook (cak:manifest-audit)
+---------------------------------------------
+
+  Event: PostToolUse on Edit tool calls.
+  Blocking: no. Warns on stderr; the turn continues.
+  Profiles: standard, strict (not in minimal).
+
+  What it does: after any Edit call, the script-side filter checks whether the
+  edited file is AndroidManifest.xml. If it is, the hook scans for two
+  specific patterns: components with android:exported="true" that lack an
+  android:permission attribute, and android:debuggable="true" set outside a
+  /debug/ manifest path.
+
+  Both of these are security findings that the android-security-reviewer agent
+  also checks, but the hook catches them immediately at edit time rather than
+  waiting for a review invocation.
+
+7.5 Release Build Guard (cak:release-guard)
+--------------------------------------------
+
+  Event: PreToolUse on Bash tool calls.
+  Blocking: yes. This is the only fail-closed hook in v0.2.0.
+  Profiles: minimal, standard, strict.
+
+  What it does: before any Bash tool execution, checks whether the command
+  contains :app:installRelease or assembleRelease. If it does, and
+  ALLOW_RELEASE_BUILD=1 is not set in the environment, the hook blocks the
+  command and returns an error.
+
+  This prevents Claude Code from accidentally triggering a release build and
+  signing a release APK when you meant to run a debug build. Release builds
+  often trigger ProGuard, signing, and CI/CD pipelines -- you want those to be
+  intentional.
+
+  To allow a release build when you explicitly want one:
+
+      export ALLOW_RELEASE_BUILD=1
+      ./gradlew :app:assembleRelease
+      unset ALLOW_RELEASE_BUILD
+
+7.6 Controlling Hooks (env vars, profiles, disabling individual hooks)
+-----------------------------------------------------------------------
+
+CAK_HOOK_PROFILE
+
+  Default: standard
+  What it controls: selects which hook IDs are active.
+  - minimal: activates cak:session-start, cak:session-end, cak:release-guard.
+  - standard: activates all five hooks.
+  - strict: identical to standard in v0.2.0 (placeholder for future stricter
+    checks).
+
+  Example: export CAK_HOOK_PROFILE=minimal
+
+CAK_DISABLED_HOOKS
+
+  Default: unset
+  What it controls: disables specific hooks by ID after profile selection.
+  Use this when you want most of a profile but need to suppress one hook for a
+  session.
+
+  Example: export CAK_DISABLED_HOOKS="cak:kt-lint,cak:manifest-audit"
+
+CAK_SESSION_START_CONTEXT
+
+  Default: on
+  What it controls: turns context injection at session start on or off without
+  disabling the hook entry itself.
+
+  Use this when you want a clean session without previous context:
+    export CAK_SESSION_START_CONTEXT=off
+
+CAK_SESSION_PERSISTENCE
+
+  Default: on
+  What it controls: turns the repo-local session summary writing on or off.
+
+  Example: export CAK_SESSION_PERSISTENCE=off
+
+CAK_SESSION_START_MAX_CHARS
+
+  Default: 8000
+  What it controls: caps how many characters of saved session context are
+  injected at startup.
+
+  Example: export CAK_SESSION_START_MAX_CHARS=4000
+
+ALLOW_RELEASE_BUILD
+
+  Default: unset
+  What it controls: allows release install/build commands that cak:release-guard
+  would otherwise block.
+
+  Example: export ALLOW_RELEASE_BUILD=1
+
+
+================================================================================
+PART 8 -- PROJECT TEMPLATES
+================================================================================
+
+8.1 When and How to Use Templates
+-----------------------------------
+
+Two templates ship with the kit:
+
+  templates/CLAUDE.android.template.md -- for pure Android projects.
+  templates/CLAUDE.kmm.template.md -- for KMP projects.
+
+These templates are CLAUDE.md starting points. They are not installed into
+~/.claude/ -- they stay in the kit's templates/ directory and get copied into
+individual projects.
+
+The /new-android and /new-kmm commands copy the relevant template into the new
+project as CLAUDE.md and fill in the {{PLACEHOLDER}} fields automatically.
+When you run these commands, you do not need to touch the template manually.
+
+For existing projects where you want to add a CLAUDE.md:
+
+  1. Copy the right template into the project root.
+  2. Fill in the placeholders: app name, package, min SDK, stack choices,
+     module map (adjust to your actual folder structure), known pitfalls, and
+     open TODOs.
+  3. Remove sections that do not apply.
+  4. Commit it.
+
+The template is also a useful checklist of what should go in a project CLAUDE.md
+even if you write it from scratch.
+
+8.2 What Goes in a Project CLAUDE.md
+--------------------------------------
+
+A good project CLAUDE.md contains:
+
+  Project metadata: name, package, platform, min SDK, target SDK, Kotlin
+  version, start date.
+
+  One-line summary: what the app does. Claude reads this to calibrate answers.
+
+  Stack table: quick reference of what is chosen for each concern -- UI, DI,
+  architecture, local DB, networking, async, navigation, logging, auth, backend,
+  testing. This is redundant with the global rules for most choices, but making
+  it explicit lets project-specific exceptions stand out clearly.
+
+  Module map: the actual folder layout of this project. This is the single most
+  valuable thing in a project CLAUDE.md because it prevents Claude from having
+  to re-infer the structure every session.
+
+  Conventions: project-specific additions or overrides to the global rules. Keep
+  this short -- only things that differ from or extend the kit's defaults.
+
+  Known pitfalls: past gotchas specific to this project. "Compose Compiler is
+  pinned to 1.5.11 because we are on Kotlin 1.9.23. When upgrading Kotlin,
+  update both." This section saves hours the first time someone runs into the
+  same issue again.
+
+  Common tasks: the Gradle commands you actually run, including project-specific
+  flags or task names that differ from the defaults.
+
+  Open TODOs: bootstrap items still pending. Remove items when they are done.
+
+  Do-not list: anti-patterns specific to this project. "Do not use Room -- this
+  is a KMP project, SQLDelight only." "Do not commit google-services.json."
+
+8.3 Keeping Project CLAUDE.md Files Up to Date
+------------------------------------------------
+
+A stale CLAUDE.md is worse than no CLAUDE.md because it gives Claude false
+context. Update it when:
+
+  - A major architectural decision changes (switching from Supabase to Firebase,
+    adopting a new navigation library).
+  - A new known pitfall bites you -- add it immediately so the next session
+    does not repeat it.
+  - The module map changes significantly.
+  - You close out an Open TODO.
+  - A "do not" becomes appropriate (the project finishes a legacy migration,
+    so the XML layout warning can be removed).
+
+Keep it short. A CLAUDE.md longer than 200 lines is treating it as
+documentation rather than live context. Anything that is feature-level detail
+belongs in code, tests, or PR descriptions -- not CLAUDE.md. Anything already
+covered by the global rules does not need to be repeated unless you are
+overriding it.
+
+The templates have a placeholder structure that trends toward 100-150 lines when
+filled in well. That is the right length.
+
+
+================================================================================
+PART 9 -- DAILY WORKFLOW
+================================================================================
+
+9.1 Starting a Session
+-----------------------
+
+Open Claude Code in the project directory. If the full profile is installed,
+the cak:session-start hook fires and loads the last-session summary if one
+exists. Claude enters the session already aware of what was in progress: which
+feature was being built, which files were being edited, what was left to do.
+
+If no session state exists (first session in this project, or you cleared it),
+start by orienting Claude:
+
+    What conventions does this project use?
+
+Claude reads the global rules and CLAUDE.md and summarizes. If the summary is
+wrong or incomplete, now is the time to say so before writing any code.
+
+9.2 Starting a New Feature
+---------------------------
+
+For any feature bigger than a trivial change:
+
+    /new-feature <feature-name>
+
+Answer the two questions. Let the scaffold run. Review the files created.
+Before committing, run the feature's tests:
+
+    ./gradlew :app:testDebugUnitTest --tests *<Feature>*
+
+If they pass on first run, the scaffold is solid. If they fail, there is a
+wiring issue -- ask Claude to fix the specific failing test.
+
+For features that need architectural thinking before scaffolding (complex
+state, platform-specific concerns, new subsystems), consult @android-architect
+first:
+
+    @android-architect This feature needs offline sync for match invites.
+    What is the shape before I scaffold?
+
+Get the decision. Then run /new-feature.
+
+9.3 Writing Code with the Kit Active
+--------------------------------------
+
+With the kit installed, Claude's responses already reflect your conventions.
+You do not need to repeat "use Manual DI" or "no XML" on every prompt.
+
+When editing a specific file, be concrete about what you want changed:
+
+    In AddBookViewModel.kt, move the form state out of the Screen composable
+    and into the view model as part of UiState. The screen should take
+    formState: FormState as a parameter and expose callbacks for each field.
+
+Avoid vague prompts like "make this better." Be specific about the behavior.
+
+When Claude produces code, read the diff before accepting. Watch for:
+  - Test modifications. If Claude changed a test to make it pass rather than
+    fixing the implementation, that is a signal.
+  - Stray imports. They accumulate.
+  - TODO comments that are really "I did not implement this."
+  - Violations of the kit rules (Hilt imports, XML layouts, hardcoded colors).
+    These mean the rules did not load; restart Claude Code.
+
+9.4 Hitting a Build Failure
+----------------------------
+
+Do not try to diagnose it yourself first. Run:
+
+    /gradle-fix
+
+If the failure is a compile-time error (R8, KSP processor, Kotlin/Compose
+version mismatch) rather than a Gradle script error, use @android-build-
+resolver directly:
+
+    @android-build-resolver <paste the error>
+
+The agent produces a structured diagnosis with the specific fix. Apply it,
+re-run, verify.
+
+If three iterations of /gradle-fix do not resolve it, accept the escalation
+path: run ./gradlew <task> --scan and share the Build Scan URL.
+
+9.5 Pre-Commit Review
+----------------------
+
+Before pushing a PR with UI changes:
+
+    /compose-review <feature-folder>
+
+Before pushing a PR with data or domain changes:
+
+    @kotlin-reviewer <file-or-folder>
+
+Before merging anything touching auth, storage, networking, or the manifest:
+
+    @android-security-reviewer
+
+Apply the blocking fixes. The non-blocking nits are optional -- decide which
+are worth addressing and which can wait. Re-run the review if you applied
+significant changes.
+
+Then run the full test suite:
+
+    ./gradlew test
+
+And verify the release build passes:
+
+    ALLOW_RELEASE_BUILD=1 ./gradlew :app:assembleRelease
+
+R8 sometimes strips reflectively-used classes in release builds that debug
+builds do not catch. The release build check is worth doing before pushing
+to a branch that will be merged.
+
+9.6 Ending a Session
+---------------------
+
+If the full profile is installed, the cak:session-end hook fires automatically
+at the end of each turn and writes the session summary to
+.claude-android-kit-state/last-session.md in the project directory. You do not
+need to do anything.
+
+If you want to leave a note for your next session, add it directly to CLAUDE.md
+under "Known pitfalls" or "Open TODOs" before closing. These notes persist
+across sessions and are read by Claude at the start of the next one.
+
+Commit what you have before closing. Claude Code does not auto-commit. If you
+rip through a feature without committing, rolling back a bad idea requires
+git reset --hard and loses everything else.
+
+
+================================================================================
+PART 10 -- CUSTOMIZATION
+================================================================================
+
+10.1 Forking the Kit
+---------------------
+
+The kit's defaults reflect one developer's preferences. Your preferences may
+differ. Fork it.
+
+To create your own version:
+
+    gh repo create my-claude-kit --template hashirhamxa/claude-android-kit
+
+Or clone and push to your own repository. Edit what does not fit. The kit is
+plain Markdown and JSON -- there is no compilation step.
+
+To version the installed kit itself:
+
+    cd ~/.claude
+    git init
+    git add rules/ agents/ commands/ skills/ hooks/ scripts/
+    git commit -m "chore: claude-android-kit v0.2.0 initial install"
+
+Now every change you make to the installed files is tracked. You can see when
+you added a rule and why. This is especially useful if you share the kit with
+teammates.
+
+10.2 Adding a Rule
+-------------------
+
+Rules live in ~/.claude/rules/cak/<pack>/<name>.md. Pick the pack that matches
+the scope:
+  - common/ for rules that fire regardless of stack.
+  - kotlin/ for language-level Kotlin rules.
+  - android/ for Android-specific rules.
+  - kmp/ for KMP-specific rules.
+
+Use an existing file as a starting structure. Copy it, rename it, and edit the
+content. Keep rule files focused -- one file per concern. A 500-line rule file
+means you need two files.
+
+The directory name determines when the rule pack fires (when you install it).
+The filename is just a label. Use descriptive names rather than numeric
+prefixes.
+
+Also add the corresponding file to the kit source directory so the installer
+can copy it in the future.
+
+10.3 Adding an Agent
+---------------------
+
+Agent files live in ~/.claude/agents/<name>.md. Each is a YAML-frontmatter
+Markdown file:
+
+    ---
+    name: sql-reviewer
+    description: Reviews SQL queries in Supabase RPC definitions, raw SQLDelight
+    queries, and database migrations for correctness, performance, and schema
+    concerns.
+    tools: ["Read", "Grep", "Glob"]
+    model: sonnet
+    ---
+
+    You are a SQL specialist. ...
+
+The description field is what Claude Code matches against to decide when the
+agent is relevant. Write it like a dispatcher instruction -- describe what
+the agent reviews and what triggers its invocation. Not a bio.
+
+The tools list limits what the agent can do. Reviewers should omit Bash.
+Resolvers that need to run commands should include it.
+
+Model choices: opus for hard decision-making (the architect), sonnet for
+execution and review, haiku only for very simple classifiers.
+
+10.4 Adding a Command
+----------------------
+
+Command files live in ~/.claude/commands/<name>.md. Structure:
+
+    ---
+    description: One-line summary of what this command does.
+    argument-hint: <arg-spec>
+    ---
+
+    # /command-name
+
+    What you produce when invoked.
+
+    ## Usage
+    Example invocations.
+
+    ## Steps
+    Numbered. Specific. Name every file to read, every question to ask,
+    every file to write.
+
+Commands are prompts with names. The clearer the numbered steps, the more
+consistent the output. Vague steps produce variable results.
+
+10.5 Adding a Skill
+--------------------
+
+Skill files live in ~/.claude/skills/<name>/SKILL.md. Structure:
+
+    ---
+    name: firebase-setup
+    description: Step-by-step workflow for adding Firebase to an existing
+    project. Use when the user wants to wire Firebase Auth, Firestore,
+    Analytics, or Crashlytics into an Android or KMP project.
+    ---
+
+    # Firebase Setup -- Workflow
+
+    ...
+
+The description is the dispatcher input. Make it specific about the conditions
+under which the skill should activate. Include keywords you would actually say
+when asking for this kind of help.
+
+Decision tree for which component type to add:
+
+  - Always-on guidance about how to write code -> Rule.
+  - A specialist you consult -> Agent.
+  - A one-word shortcut for a task -> Command.
+  - A detailed recipe that needs steps -> Skill.
+
+Having both a command and a skill for the same workflow is normal and useful.
+The command is the shortcut (one-shot). The skill is the deep recipe (step-by-
+step recovery when something goes wrong mid-workflow).
+
+10.6 Versioning Your Customizations
+-------------------------------------
+
+If you evolve the kit over time (adding rules, refining agents, adding skills
+for Firebase patterns you have learned), track the evolution:
+
+    cd ~/.claude
+    git log --oneline
+
+"When did I add the SQL reviewer agent, and why?" is a question you will want
+to answer six months from now.
+
+Commit messages in the ~/.claude git log can follow the same Conventional
+Commits style the kit enforces for project code. "feat(rules): add firebase-
+patterns rule for Firestore RLS and Storage rules" is informative.
+
+If you share the kit with teammates, host it in a shared repository and have
+teammates clone it and run the installer. Changes to conventions then go
+through the same pull request process as code changes.
+
+
+================================================================================
+PART 11 -- TROUBLESHOOTING
+================================================================================
+
+11.1 Rules not loading
+-----------------------
+
+SYMPTOM: Claude gives generic Android advice that does not reflect the kit's
+conventions. No mention of AppContainer, Compose-only, or the library choices.
+
+CAUSE: The rule files are either not in the expected location, or Claude Code
+is not configured to load them.
+
+FIX:
+
+  1. Verify the files are present:
+       ls ~/.claude/rules/cak/
+     You should see common/, kotlin/, android/, and/or kmp/ directories.
+
+  2. Ask Claude to read a specific file:
+       What is in ~/.claude/rules/cak/android/android-architecture.md?
+     If Claude says it cannot access the file, check Claude Code settings for
+     the rules directory configuration.
+
+  3. If the files are present but Claude is not reading them, try a context
+     length issue fix: start a fresh conversation (long conversations drop
+     early context). The rules reload at the start of each session.
+
+  4. If using manual install, verify the copy step completed:
+       ls ~/.claude/rules/cak/android/android-architecture.md
+
+11.2 Agent not found
+---------------------
+
+SYMPTOM: @android-architect or another agent name is not recognized. Claude
+treats @agent-name as text rather than an agent invocation.
+
+CAUSE: The agent file is not in ~/.claude/agents/, or Claude Code requires a
+restart to recognize newly added files.
+
+FIX:
+
+  1. Verify the file is present:
+       ls ~/.claude/agents/android-architect.md
+     If missing, copy it from the kit: cp agents/android-architect.md ~/.claude/agents/
+
+  2. Restart Claude Code. Some versions require a restart after new agent files
+     are added.
+
+  3. If the agent is found but gives the wrong kind of answer, the issue is
+     not "not found" but "wrong framing" -- see the note in GUIDE.md about
+     reframing rather than arguing in-conversation.
+
+11.3 Hook not firing
+---------------------
+
+SYMPTOM: Session context is not loading at startup, or the release guard is not
+blocking release commands, or ktlint is not warning after edits.
+
+CAUSE: Hooks require the full install profile, or Node.js is not available, or
+the CAK_HOOK_PROFILE is set to minimal (which excludes cak:kt-lint and
+cak:manifest-audit).
+
+FIX:
+
+  1. Verify hooks were installed:
+       ls ~/.claude/hooks.json
+       ls ~/.claude/scripts/hooks/
+
+  2. Verify Node.js is available:
+       node --version
+
+  3. Check CAK_HOOK_PROFILE:
+       echo $CAK_HOOK_PROFILE
+     If it is "minimal", switch to "standard" to get all hooks.
+
+  4. Check CAK_DISABLED_HOOKS:
+       echo $CAK_DISABLED_HOOKS
+     If the hook ID is listed, it is explicitly disabled.
+
+  5. Re-install with full profile:
+       ./install.sh --profile full --force
+
+11.4 release-guard blocking an intentional release build
+---------------------------------------------------------
+
+SYMPTOM: You want to build a release APK and the cak:release-guard hook blocks
+the command.
+
+CAUSE: By design. The hook blocks assembleRelease and installRelease unless
+ALLOW_RELEASE_BUILD=1 is set.
+
+FIX: Set the environment variable for that shell session:
+
+    export ALLOW_RELEASE_BUILD=1
+    ./gradlew :app:assembleRelease
+    unset ALLOW_RELEASE_BUILD
+
+Do not add ALLOW_RELEASE_BUILD=1 to your shell profile permanently -- that
+defeats the guard's purpose.
+
+11.5 Session state not persisting between sessions
+---------------------------------------------------
+
+SYMPTOM: Opening Claude Code in the same project directory gives no memory of
+the previous session.
+
+CAUSE: The cak:session-end hook is not running, the full profile is not
+installed, or CAK_SESSION_PERSISTENCE is set to off.
+
+FIX:
+
+  1. Verify the hooks are installed (see 11.3).
+  2. Check: ls .claude-android-kit-state/last-session.md
+     If the file does not exist, cak:session-end never ran successfully.
+  3. Check CAK_SESSION_PERSISTENCE:
+       echo $CAK_SESSION_PERSISTENCE
+     If it is "off", the persistence is disabled.
+  4. Check that Node.js can write to the project directory (permissions issue).
+
+11.6 ktlint warnings on every edit
+------------------------------------
+
+SYMPTOM: Every time Claude edits a .kt file, ktlint warnings appear. This is
+distracting if the existing codebase has many pre-existing violations.
+
+CAUSE: The cak:kt-lint hook runs ktlintCheck after every Kotlin edit. If the
+file has existing violations, they will warn.
+
+FIX: Two options.
+
+  Option A -- Fix the violations. Run ktlint on the project and apply the
+  fixes. Once the codebase is clean, the hook only warns on new violations.
+    ./gradlew ktlintFormat
+
+  Option B -- Disable the hook for sessions where it is too noisy:
+    export CAK_DISABLED_HOOKS="cak:kt-lint"
+  This keeps the other hooks active.
+
+11.7 install.ps1 reports parse errors
+---------------------------------------
+
+SYMPTOM: Running .\install.ps1 -Profile core on Windows gives a parse error or
+"unexpected token" message.
+
+CAUSE: PowerShell execution policy may be restricting script execution, or the
+file was saved with incorrect line endings.
+
+FIX:
+
+  1. Check the execution policy:
+       Get-ExecutionPolicy
+     If it is Restricted, set it for the current session:
+       Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+  2. Verify the file was not corrupted during download. Re-clone the repository
+     if in doubt.
+
+  3. If the parse error is specific to a line, check that the PowerShell
+     version is 5.1 or later:
+       $PSVersionTable.PSVersion
+
+11.8 doctor reports missing files
+-----------------------------------
+
+SYMPTOM: node scripts/cak.js doctor shows [MISSING] for one or more files.
+
+CAUSE: Files that were recorded in the state file are no longer present in
+~/.claude/. This can happen if files were manually deleted, if ~/.claude/ was
+cleaned, or if the state file records a file that was never actually copied.
+
+FIX: Run repair to re-copy missing files from the kit source:
+
+    node scripts/cak.js repair
+
+The repair command reconstructs the source path from the destination path and
+copies only the missing files. Present files are left alone.
+
+If repair cannot find its source files (because the kit was cloned to a
+different location and moved), re-clone and run the installer with --force:
+
+    ./install.sh --profile core --force
+
+11.9 Kit and project CLAUDE.md giving conflicting instructions
+--------------------------------------------------------------
+
+SYMPTOM: Claude seems confused about whether to follow the global rule or the
+project override. It might follow the global rule even when the project CLAUDE.md
+says otherwise.
+
+CAUSE: The project CLAUDE.md override is ambiguously worded. Claude sees two
+contradictory instructions and picks one.
+
+FIX: Make the override explicit and unambiguous. The recommended pattern:
+
+    ## DI (overrides ~/.claude/rules/cak/android/android-architecture.md)
+    This project uses Hilt (inherited from team standard).
+    AppContainer guidance does not apply here.
+
+The parenthetical "overrides" phrase signals to Claude that this is an
+intentional divergence, not a mistake. Without it, Claude may treat the two
+instructions as potentially harmonious and try to satisfy both.
+
+11.10 Kit installed but Claude Code ignoring conventions
+---------------------------------------------------------
+
+SYMPTOM: Claude suggests Hilt, uses LiveData, or generates XML layouts despite
+the rules being installed and verified.
+
+CAUSE: The conversation context has grown long enough that early context (the
+rules) has been dropped from the effective context window. This is common in
+sessions that span many file reads and multi-step scaffolding.
+
+FIX:
+
+  1. Start a fresh conversation. The rules reload at the start of each session.
+
+  2. For long working sessions, periodically orient Claude:
+       Reminder: this project uses AppContainer (no Hilt), Compose only, Flow
+       over LiveData. Apply these for the next task.
+
+  3. If the problem recurs frequently, the rules may be structured in a way
+     that makes them easy to drop. Edit the rule files to put the most critical
+     constraints near the top of each file.
+
+
+================================================================================
+PART 12 -- REFERENCE
+================================================================================
+
+12.1 Full File Tree (after full install)
+-----------------------------------------
+
+After running ./install.sh --profile full, the following files exist in ~/.claude/:
+
+    ~/.claude/
+    ├── .cak-install-state.json
+    ├── rules/
+    │   └── cak/
+    │       ├── common/
+    │       │   ├── git-workflow.md
+    │       │   ├── productivity-anti-duplication.md
+    │       │   ├── security.md
+    │       │   └── testing.md
+    │       ├── kotlin/
+    │       │   └── kotlin-style.md
+    │       ├── android/
+    │       │   ├── android-architecture.md
+    │       │   ├── compose-patterns.md
+    │       │   ├── security.md
+    │       │   └── testing.md
+    │       └── kmp/
+    │           ├── kmm-layering.md
+    │           ├── security.md
+    │           └── testing.md
+    ├── agents/
+    │   ├── android-architect.md
+    │   ├── android-build-resolver.md
+    │   ├── android-security-reviewer.md
+    │   ├── compose-reviewer.md
+    │   ├── gradle-resolver.md
+    │   ├── kmp-migration-planner.md
+    │   ├── kotlin-reviewer.md
+    │   └── room-migration-planner.md
+    ├── commands/
+    │   ├── audit-kit.md
+    │   ├── compose-review.md
+    │   ├── gradle-fix.md
+    │   ├── new-android.md
+    │   ├── new-feature.md
+    │   ├── new-kmm.md
+    │   └── ui-from-image.md
+    ├── skills/
+    │   ├── feature-vertical-slice/
+    │   │   └── SKILL.md
+    │   ├── gradle-troubleshooting/
+    │   │   └── SKILL.md
+    │   ├── new-project-android/
+    │   │   └── SKILL.md
+    │   ├── new-project-kmm/
+    │   │   └── SKILL.md
+    │   └── ui-from-image/
+    │       └── SKILL.md
+    ├── hooks.json
+    └── scripts/
+        ├── cak.js
+        ├── lib/
+        │   └── utils.js
+        └── hooks/
+            ├── session-start.js
+            ├── session-end.js
+            ├── kt-lint-check.js
+            ├── manifest-audit.js
+            └── release-guard.js
+
+The kit source also contains templates/ (not installed to ~/.claude/):
+
+    templates/
+    ├── CLAUDE.android.template.md
+    └── CLAUDE.kmm.template.md
+
+12.2 Agent Quick Reference Table
+----------------------------------
+
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| Name                       | Scope                   | Invoke When                    | Model | Tools                                |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @android-architect         | Architecture decisions  | New feature shape, library     | Opus  | Read, Grep, Glob, Bash               |
+|                            | module layout, state    | choice, layering question,     |       |                                      |
+|                            | design, trade-offs      | before non-trivial scaffold    |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @android-build-resolver    | Compile-time failures:  | assembleRelease fails, KSP     | Sonnet| Read, Grep, Glob, Bash               |
+|                            | R8, KSP, KAPT, Compose  | task fails, R8 strips a class  |       |                                      |
+|                            | Compiler, expect/actual | after enabling minification    |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @android-security-reviewer | Manifest exposure,      | Before any PR touching auth,   | Sonnet| Read, Grep, Glob                     |
+|                            | network config, secrets,| storage, networking, manifest; |       |                                      |
+|                            | storage, token handling | before every release cut       |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @compose-reviewer          | Jetpack Compose and CMP | Before pushing UI PR; when a   | Sonnet| Read, Grep, Glob                     |
+|                            | code review: state,     | screen feels structurally      |       |                                      |
+|                            | recomposition, effects  | wrong                          |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @gradle-resolver           | Gradle script errors,   | Any build failure at Gradle    | Sonnet| Read, Grep, Glob, Bash               |
+|                            | AGP/Kotlin/KSP version  | evaluation level; ./gradlew    |       |                                      |
+|                            | matrix, manifest merger | itself fails to run            |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @kmp-migration-planner     | Moving code between     | Sharing Android code to KMP;   | Sonnet| Read, Grep, Glob                     |
+|                            | commonMain/androidMain/ | splitting large expect class;  |       |                                      |
+|                            | iosMain; expect/actual  | iOS build fails unexpectedly   |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @kotlin-reviewer           | Non-UI Kotlin: repos,   | Any data or domain layer diff; | Sonnet| Read, Grep, Glob                     |
+|                            | use cases, mappers,     | pair with @compose-reviewer    |       |                                      |
+|                            | DTOs, AppContainer      | for full-stack PR review       |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+| @room-migration-planner    | Room schema migrations: | Any @Entity change that        | Sonnet| Read, Grep, Glob                     |
+|                            | AutoMigration vs manual,| requires a DB version bump     |       |                                      |
+|                            | DDL, MigrationTestHelper|                                |       |                                      |
++----------------------------+-------------------------+--------------------------------+-------+--------------------------------------+
+
+12.3 Command Quick Reference Table
+------------------------------------
+
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| Command          | Arguments                      | What It Does                     | Dispatches To               |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /new-android     | <app-name> [package-name]      | Bootstraps pure Android project  | @android-architect (shape   |
+|                  |                                | from scratch with all conventions| check before scaffold)      |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /new-kmm         | <app-name> [package-name]      | Bootstraps KMP project with      | @android-architect (shape   |
+|                  |                                | shared module, CMP, Xcode project| check before scaffold)      |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /new-feature     | <feature-name>                 | Scaffolds full vertical slice    | @android-architect (shape   |
+|                  |                                | (domain, data, UI, nav, tests)   | check); feature-vertical-   |
+|                  |                                | in existing Android or KMP project| slice skill                |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /compose-review  | <file-or-folder>               | Reviews Compose code and returns | @compose-reviewer           |
+|                  |                                | structured verdict with blocking |                             |
+|                  |                                | issues and nits                  |                             |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /gradle-fix      | [command] or [paste] or none   | Diagnoses Gradle build failure,  | @gradle-resolver; gradle-   |
+|                  |                                | applies fix, verifies (up to 3   | troubleshooting skill       |
+|                  |                                | iterations)                      |                             |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /ui-from-image   | [figma URL | stitch URL |      | Converts visual reference to     | ui-from-image skill         |
+|                  |  image path | description]    | Compose code via 8-phase         |                             |
+|                  |                                | fidelity workflow                |                             |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+| /audit-kit       | [optional focus area]          | Counts kit files, compares to    | (reads kit source directly) |
+|                  |                                | doc claims, flags drift; report  |                             |
+|                  |                                | only, no modifications           |                             |
++------------------+--------------------------------+----------------------------------+-----------------------------+
+
+12.4 Hook Quick Reference Table
+---------------------------------
+
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| ID                   | Trigger           | Blocking | Profile                   | Disable With              |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| cak:session-start    | SessionStart      | No       | minimal, standard, strict | CAK_SESSION_START_CONTEXT=|
+|                      |                   |          |                           | off                       |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| cak:session-end      | Stop              | No       | minimal, standard, strict | CAK_SESSION_PERSISTENCE=  |
+|                      |                   |          |                           | off                       |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| cak:release-guard    | PreToolUse (Bash) | Yes      | minimal, standard, strict | ALLOW_RELEASE_BUILD=1     |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| cak:kt-lint          | PostToolUse       | No       | standard, strict          | CAK_DISABLED_HOOKS=       |
+|                      | (Edit|Write)      |          |                           | "cak:kt-lint"             |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+| cak:manifest-audit   | PostToolUse       | No       | standard, strict          | CAK_DISABLED_HOOKS=       |
+|                      | (Edit)            |          |                           | "cak:manifest-audit"      |
++----------------------+-------------------+----------+---------------------------+---------------------------+
+
+12.5 Env Var Reference Table
+------------------------------
+
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| Variable                      | Default   | What It Controls                             | Example                                  |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| CAK_HOOK_PROFILE              | standard  | Which hook IDs are active. Values: minimal,  | export CAK_HOOK_PROFILE=minimal          |
+|                               |           | standard, strict.                            |                                          |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| CAK_DISABLED_HOOKS            | (unset)   | Comma-separated list of hook IDs to disable  | export CAK_DISABLED_HOOKS=               |
+|                               |           | after profile selection.                     | "cak:kt-lint,cak:manifest-audit"         |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| CAK_SESSION_START_CONTEXT     | on        | Turns session context injection at startup   | export CAK_SESSION_START_CONTEXT=off     |
+|                               |           | on or off. Set to "off" for a clean session. |                                          |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| CAK_SESSION_PERSISTENCE       | on        | Turns repo-local session summary writing on  | export CAK_SESSION_PERSISTENCE=off       |
+|                               |           | or off.                                      |                                          |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| CAK_SESSION_START_MAX_CHARS   | 8000      | Maximum characters of saved session context  | export CAK_SESSION_START_MAX_CHARS=4000  |
+|                               |           | injected at startup.                         |                                          |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+| ALLOW_RELEASE_BUILD           | (unset)   | Set to 1 to allow assembleRelease and        | export ALLOW_RELEASE_BUILD=1             |
+|                               |           | installRelease past the release-guard hook.  |                                          |
++-------------------------------+-----------+----------------------------------------------+------------------------------------------+
+
+12.6 Rule Pack Reference Table
+--------------------------------
+
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| File                                  | Pack     | What It Enforces                                  | Scope                       |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| common/git-workflow.md                | common   | Conventional Commits, branch naming, small PRs,   | All projects, all stacks    |
+|                                       |          | no commented-out code, .gitignore hygiene          |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| common/productivity-anti-duplication  | common   | Grep before create, single source of truth,       | All projects, all stacks    |
+| .md                                   |          | reuse over fork, no orphan files, plan before edit|                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| common/security.md                    | common   | Secrets out of git, Supabase RLS, Firebase rules, | All projects, all stacks    |
+|                                       |          | Ktor logging in release, cert pinning, CVE checks |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| common/testing.md                     | common   | Coverage targets by layer, fakes over mocks,      | All projects, all stacks    |
+|                                       |          | Turbine for Flow, TDD for parsers, naming style   |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| kotlin/kotlin-style.md                | kotlin   | val over var, no !!, Result at boundaries,        | All Kotlin code             |
+|                                       |          | structured concurrency, no wildcard imports,      |                             |
+|                                       |          | ktlint/detekt required                            |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| android/android-architecture.md       | android  | AppContainer (no Hilt/Koin), Clean Arch + MVVM,  | Android projects            |
+|                                       |          | single UiState, single activity, flowOn in repo   |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| android/compose-patterns.md           | android  | State hoisting, Route/Screen split,               | Android + KMP Compose UI    |
+|                                       |          | collectAsStateWithLifecycle, LaunchedEffect keys, |                             |
+|                                       |          | list keys, @Immutable, no hardcoded colors        |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| android/security.md                   | android  | BuildConfig secrets, no cleartext HTTP,           | Android projects            |
+|                                       |          | EncryptedSharedPreferences, Timber discipline,    |                             |
+|                                       |          | manifest hardening, minimum permissions           |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| android/testing.md                    | android  | ViewModel state tests with fakes, in-memory Room, | Android projects            |
+|                                       |          | Compose UI tests for critical flows, snapshots    |                             |
+|                                       |          | for visual regression, MockK only as last resort  |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| kmp/kmm-layering.md                   | kmp      | commonMain first, expect/actual as last resort,   | KMP projects                |
+|                                       |          | SQLDelight over Room, Ktor with platform engines, |                             |
+|                                       |          | three iOS targets, what not to share              |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| kmp/security.md                       | kmp      | iOS ATS no exceptions in release, Keychain for    | KMP projects, iOS target    |
+|                                       |          | sensitive storage, entitlements reviewed before   |                             |
+|                                       |          | each release                                      |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+| kmp/testing.md                        | kmp      | commonTest for behavior, androidTest and iosTest  | KMP projects                |
+|                                       |          | for platform integration, SQLDelight TestDriver,  |                             |
+|                                       |          | Mockative for multiplatform mocking               |                             |
++---------------------------------------+----------+---------------------------------------------------+-----------------------------+
+
+================================================================================
+END OF GUIDE
+================================================================================
