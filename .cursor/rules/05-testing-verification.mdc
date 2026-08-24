@@ -1,0 +1,12 @@
+---
+description: Testing and verification standards for Android & KMP
+globs: ["**/*Test.kt", "**/*Spec.kt", "**/test/**/*.kt"]
+alwaysApply: false
+---
+
+# Testing Standards
+Refer to SSOT: `.shared-rules/05-testing-verification.md`
+
+- **Flow Testing:** Use `kotlinx-coroutines-test` and `Turbine` (`viewModel.uiState.test { ... }`).
+- **Fakes over Mocks:** Use in-memory repository fakes instead of heavy mocking frameworks in `commonTest`.
+- **Dispatcher Injection:** Inject `CoroutineDispatcher` (default to `StandardTestDispatcher`) into ViewModels and Repositories.

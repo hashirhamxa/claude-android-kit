@@ -1,0 +1,12 @@
+---
+description: Native iOS SwiftUI & KMP Bridge rules
+globs: ["iosApp/**/*.swift", "**/*.swift"]
+alwaysApply: false
+---
+
+# SwiftUI & Swift 6 Interop
+Refer to SSOT: `.shared-rules/04-swiftui-interop.md`
+
+- **SKIE Bridging:** Consume Kotlin `StateFlow` as Swift `AsyncSequence` or through SKIE-generated `@Observable` view model wrappers.
+- **Sealed Interfaces:** Match Kotlin sealed hierarchies using SKIE native Swift enum pattern matching (`switch viewModel.uiState { case .loading: ... }`).
+- **Concurrency:** Ensure all UI state updates and SwiftUI view bindings run isolated to `@MainActor`. Comply with Swift 6 strict concurrency checks.

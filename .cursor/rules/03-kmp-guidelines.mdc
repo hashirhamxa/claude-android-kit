@@ -1,0 +1,13 @@
+---
+description: Kotlin Multiplatform commonMain and cross-platform module standards
+globs: ["**/commonMain/**/*.kt", "**/androidMain/**/*.kt", "**/iosMain/**/*.kt", "libs.versions.toml"]
+alwaysApply: false
+---
+
+# Kotlin Multiplatform Guidelines
+Refer to SSOT: `.shared-rules/03-kmp-guidelines.md`
+
+- **Artifacts:** Use official Google `androidx` KMP artifacts (`androidx.lifecycle`, `androidx.room`, `androidx.datastore`).
+- **expect/actual Policy:** Prefer interface injection in `commonMain` implemented by platform modules over `expect/actual` classes.
+- **Engines:** Ktor 3.x client must use `OkHttp` engine on Android and `Darwin` engine with certificate pinning on iOS.
+- **Database:** Room KMP must use `BundledSQLiteDriver` configured in platform factory initializers.

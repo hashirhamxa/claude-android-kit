@@ -1,0 +1,14 @@
+---
+description: Jetpack Compose and Compose Multiplatform UI standards
+globs: ["**/*Screen.kt", "**/*Component.kt", "**/ui/**/*.kt", "**/*Composable.kt"]
+alwaysApply: false
+---
+
+# Compose Guidelines
+Refer to SSOT: `.shared-rules/02-compose-guidelines.md`
+
+- **Lifecycle-Aware State:** ALWAYS use `collectAsStateWithLifecycle()` on Android/CMP. NEVER use standard `collectAsState()`.
+- **Type-Safe Navigation:** Use `@Serializable` objects/classes with Jetpack Navigation 2.8+ / Navigation3. Never use raw URL-style route strings.
+- **Compose Stability:** Ensure function parameters use immutable collections or stable wrappers. Pass lambdas instead of modifying state directly inside children.
+- **Edge-to-Edge:** Use `Modifier.safeDrawingPadding()`, `Modifier.imePadding()`, or `Modifier.statusBarsPadding()`. Never hardcode top/bottom padding values.
+- **Lazy Collections:** Always supply a stable, unique `key = { ... }` in `items()`.

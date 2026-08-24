@@ -1,0 +1,13 @@
+---
+description: Unidirectional Data Flow and Clean Architecture rules for Kotlin & Android
+globs: ["**/*ViewModel.kt", "**/domain/**/*.kt", "**/data/**/*.kt", "**/ui/**/*.kt"]
+alwaysApply: false
+---
+
+# Architecture & UDF Standards
+Refer to SSOT: `.shared-rules/01-architecture-udf.md`
+
+- **UiState:** Model as a single sealed interface (`Loading`, `Success`, `Error`). Never expose multiple mutable StateFlows from a ViewModel.
+- **State Production:** Always use `.stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5_000), initialValue = ...)`.
+- **Intents/Effects:** User actions must pass through sealed `UiIntent`. One-off events (navigation, snackbars) must use a buffered `Channel<UiEffect>` exposed as a `Flow`.
+- **Layer Boundary:** UI layers must never import or reference Data/DTO classes directly; always map through Domain Models.
