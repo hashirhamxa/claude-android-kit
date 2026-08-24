@@ -1,193 +1,193 @@
-# claude-android-kit
+# Claude Android Kit: Production Multiplatform AI Mobile Toolkit
 
-A Claude Code starter kit for Android & Kotlin Multiplatform. Drop it into `~/.claude/` and every new project inherits opinionated defaults — **Manual DI, Compose, Clean Architecture + MVVM, Ktor, Room/SQLDelight, Firebase, Supabase.**
-
-**Version 0.2.0** — see [CHANGELOG.md](./CHANGELOG.md).
-
-Ships as:
-
-- **4 rule packs (12 files total)** — `common/`, `kotlin/`, `android/`, `kmp/`.
-- **8 agents** — `@android-architect`, `@compose-reviewer`, `@gradle-resolver`, `@kmp-migration-planner`, `@android-build-resolver`, `@android-security-reviewer`, `@kotlin-reviewer`, `@room-migration-planner`.
-- **7 slash commands** — `/new-android`, `/new-kmm`, `/new-feature`, `/compose-review`, `/gradle-fix`, `/ui-from-image`, `/audit-kit`.
-- **5 skills** — full workflow recipes for bootstrapping Android/KMP projects, scaffolding vertical-slice features, diagnosing Gradle failures, and generating UI from images.
-- **2 templates** — per-project `CLAUDE.md` for pure Android and KMP.
-
-## Hooks
-
-Hooks add a small runtime layer on top of the rules: session resume/persistence, warn-only Kotlin and manifest audits, and one hard stop for accidental release builds. Install them with `./install.sh --profile full` (or `.\install.ps1 -Profile full` on Windows). Use `CAK_HOOK_PROFILE`, `CAK_DISABLED_HOOKS`, `CAK_SESSION_START_CONTEXT=off`, `CAK_SESSION_PERSISTENCE=off`, or `ALLOW_RELEASE_BUILD=1` when you need an escape hatch instead of editing the files. Full hook docs live in `hooks/README.md`.
-
-Run `node scripts/cak.js feedback` weekly to see how the kit is performing for you and what to change next.
+A production-grade mobile architecture and AI developer toolkit bridging Jetpack Compose, Kotlin Multiplatform (KMP), Android Native, and Native iOS (SwiftUI). Engineered to eliminate LLM hallucinations and code drift across Claude Code, Cursor, and Google Antigravity.
 
 ---
 
-## Install
+## 🏛️ System Architecture
 
-### Option A — Automated (recommended)
+```text
+┌───────────────────────────────────┐
+│        .shared-rules/ (SSOT)      │
+│  UDF • Compose • KMP • Swift • CI │
+└─────────────────┬─────────────────┘
+                  │
+  ┌───────────────┼───────────────┐
+  ▼               ▼               ▼
+┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+│    Claude Code    │  │      Cursor       │  │ Google Antigravity│
+│     CLAUDE.md     │  │   .cursor/rules/  │  │ AGENT_WORKSPACE.md│
+│  .claude/commands │  │    *.mdc Globs    │  │ Verification Gates│
+└───────────────────┘  └───────────────────┘  └───────────────────┘
+  │                       │                      │
+  └───────────────────────┼──────────────────────┘
+                          ▼
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                                   Modular Codebase                                    │
+│                                                                                       │
+│   ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│   │                                 build-logic                                   │   │
+│   │        kit.kmp.library • kit.kmp.feature • kit.android.application            │   │
+│   └───────────────────────────────────────┬───────────────────────────────────────┘   │
+│                                           │                                           │
+│                   ┌───────────────────────┴───────────────────────┐                   │
+│                   ▼                                               ▼                   │
+│   ┌───────────────────────────────┐               ┌───────────────────────────────┐   │
+│   │         core:network          │               │         core:database         │   │
+│   │    Ktor 3 (OkHttp/Darwin)     │               │           Room KMP            │   │
+│   └───────────────┬───────────────┘               └───────────────┬───────────────┘   │
+│                   │                                               │                   │
+│                   └───────────────────────┬───────────────────────┘                   │
+│                                           ▼                                           │
+│   ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│   │                                feature:<name>                                 │   │
+│   │    :domain (Pure Models) ──▶ :data (Ktor/Room) ──▶ :ui (UDF + StateFlow)      │   │
+│   └───────────────────────────────────────┬───────────────────────────────────────┘   │
+│                                           │                                           │
+│                   ┌───────────────────────┴───────────────────────┐                   │
+│                   ▼                                               ▼                   │
+│   ┌───────────────────────────────┐               ┌───────────────────────────────┐   │
+│   │        Android Target         │               │          iOS Target           │   │
+│   │   Compose • Navigation 2.8+   │               │   SwiftUI • SKIE Observable   │   │
+│   └───────────────────────────────┘               └───────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✨ Key Features
+
+- **Single Source of Truth (SSOT) Architecture:** Centralized rules in `.shared-rules/` prevent code drift and synchronize constraints across Cursor, Claude Code, and Antigravity.
+- **Modern Multiplatform Stack:** Kotlin 2.1+, Jetpack Compose Multiplatform, Ktor 3.x, Room 3 KMP with SQLite Bundled Driver, and Koin 4.x.
+- **Native Swift & iOS Interop:** Pre-configured [SKIE](https://skie.touchlab.co/) bridge converting Kotlin `StateFlow` and sealed hierarchies directly into Swift `AsyncSequence`, `@Observable` macros, and pattern-matchable enums.
+- **Strict UDF Contracts:** Standardized `UiState` (sealed interface), `UiIntent`, and single-fire `UiEffect` pipelines with `stateIn(WhileSubscribed(5000))`.
+- **Zero-Boilerplate Build Logic:** Custom Gradle convention plugins (`kit.kmp.library`, `kit.kmp.feature`, `kit.android.application`) managing SDKs, targets, and compiler options.
+- **Automated Scaffolding & Verification:** Zero-dependency Python tools to scaffold features and statically lint code for banned anti-patterns before compilation.
+
+---
+
+## 📁 Repository Layout
+
+```text
+├── .shared-rules/       # Central SSOT guidelines (Architecture, Compose, KMP, Swift, Tests)
+├── .cursor/rules/       # Cursor IDE rules mapped with target file globs (*.mdc)
+├── .claude/             # Claude Code slash commands (/scaffold-feature, /review-compose, /verify)
+├── .antigravity/        # Antigravity task gates and agent role execution boundaries
+├── build-logic/         # Gradle Convention Plugins (build-logic hierarchy)
+├── core/
+│   ├── network/         # Ktor 3 client factory + OkHttp / Darwin engines
+│   ├── database/        # Room 3 KMP database + multiplatform driver builders
+│   └── designsystem/    # Material 3 Adaptive tokens, Theme, Typography, Colors
+├── feature/             # Feature modules (:domain, :data, :ui)
+├── gradle/
+│   └── libs.versions.toml # Conflict-free central version catalog
+├── tools/               # Automation scripts (scaffolding, static AST linter, verification)
+├── CLAUDE.md            # Claude Code entry point
+└── AGENT_WORKSPACE.md   # Antigravity & multi-agent workspace configuration
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Developer Environment Setup
+Run the bootstrap script to configure local Git hooks and permissions:
 
 ```bash
-git clone https://github.com/hashirhamxa/claude-android-kit.git
-cd claude-android-kit
-
-# macOS / Linux
-./install.sh --profile core
-
-# Windows PowerShell
-.\install.ps1 -Profile core
+chmod +x tools/setup_dev_environment.sh
+./tools/setup_dev_environment.sh
 ```
 
-Profiles:
-
-| Profile | What's included |
-|---|---|
-| `minimal` | rules + agents |
-| `core` | rules + agents + commands + skills *(default)* |
-| `full` | core + hooks + scripts |
-
-Other flags: `--dry-run` (preview without copying), `--force` (overwrite existing files), `--without hooks` (skip hooks even in full), `--uninstall` (remove everything CAK installed).
-
-After install, manage your installation with `node scripts/cak.js`:
+### 2. Scaffold a New Feature
+Generate a 3-tier Clean Architecture feature (`:domain`, `:data`, `:ui`) with complete UDF contracts:
 
 ```bash
-node scripts/cak.js doctor          # check all installed files are present
-node scripts/cak.js repair          # re-copy any missing files from the kit
-node scripts/cak.js list-installed  # list every managed file
-node scripts/cak.js uninstall       # clean removal using the state file
+python tools/scaffold_feature.py <feature_name> [package_name]
+# Example: python tools/scaffold_feature.py profile com.kit
 ```
 
----
+Then register the new modules in `settings.gradle.kts`:
 
-### Option B — Manual
+```kotlin
+include(":feature:profile:domain")
+include(":feature:profile:data")
+include(":feature:profile:ui")
+```
+
+### 3. Run Static Architecture Linting
+Verify your code against the `.shared-rules/` SSOT without invoking a full build:
 
 ```bash
-git clone https://github.com/hashirhamxa/claude-android-kit.git
-cd claude-android-kit
-
-mkdir -p ~/.claude/agents ~/.claude/commands ~/.claude/skills
-
-# Namespaced under cak/ so it coexists with other kits
-mkdir -p ~/.claude/rules/cak
-
-# Everyone installs common + your primary stack
-cp -r rules/common  ~/.claude/rules/cak/
-cp -r rules/kotlin  ~/.claude/rules/cak/
-
-# Android-only project
-cp -r rules/android ~/.claude/rules/cak/
-
-# KMP project
-cp -r rules/kmp     ~/.claude/rules/cak/
-# (install android/ too if your KMP app has an Android target with Compose UI)
-
-cp    agents/*   ~/.claude/agents/
-cp    commands/* ~/.claude/commands/
-cp -r skills/*   ~/.claude/skills/
+python tools/verify_architecture.py
 ```
 
-A pure Android project needs `common/ + kotlin/ + android/`. A KMP project needs all four.
-
-The `templates/` stay with you — copy the right one into each new project as `CLAUDE.md` and fill in placeholders.
-
----
-
-## Verify
-
-Open Claude Code in any directory and ask:
-
-> What conventions do you apply to my Android/Kotlin work?
-
-You should see Manual DI, Compose-only, Flow over LiveData, Clean Arch + MVVM, etc. If not, see the troubleshooting section in [`GUIDE.md`](./GUIDE.md#14-troubleshooting).
-
----
-
-## First project
-
-```
-/new-android MyApp com.example.myapp
-```
-
-Or for KMP:
-
-```
-/new-kmm MyApp com.example.myapp
-```
-
-Add a feature:
-
-```
-/new-feature booking
-```
-
----
-
-## Folder layout
-
-```
-claude-android-kit/
-├── rules/          # Namespaced rule packs (~/.claude/rules/cak/)
-├── agents/         # Specialized subagents (~/.claude/agents/)
-├── commands/       # Slash commands (~/.claude/commands/)
-├── hooks/          # Hook config and hook docs
-├── scripts/        # Node hook implementations and shared helpers
-├── skills/         # Workflow definitions (~/.claude/skills/)
-│   └── ui-from-image/   # Figma / Stitch / screenshot → Compose
-├── templates/      # Project-level CLAUDE.md templates
-├── README.md       # You are here
-├── GUIDE.md        # Reference manual — what each file does, when to override, KMP deep dive
-└── WORKFLOW.md     # Process manual — how to actually get work done, with a worked example
-```
-
-**Read `GUIDE.md` to understand the kit. Read `WORKFLOW.md` to see how it fits into a real workday.**
-
----
-
-## Philosophy
-
-- **Manual DI** — no Hilt, no Koin. AppContainer + constructor injection. Compile-time safety, explicit graph, trivial to mock in tests.
-- **Compose everywhere** — no XML in new code.
-- **Flow over LiveData** — `StateFlow`/`SharedFlow` in view models, cold `Flow` in repositories.
-- **Offline-first** — local DB is source of truth, network is a sync layer.
-- **Vertical slices** — feature = data + domain + ui + di in one pass, not horizontal layers.
-- **Boring infra** — Ktor, Room, WorkManager, Firebase, Supabase. Save creativity for the product.
-
-Project-level `CLAUDE.md` beats this kit when they disagree. Override at the project, don't fight the kit globally.
-
----
-
-## Layering
-
-```
-~/.claude/rules/cak/      ← global, always on (this kit)
-<project>/CLAUDE.md       ← per-project, overrides globals
-current conversation      ← overrides everything for one task
-```
-
----
-
-## Customize
-
-These defaults reflect how I build. Yours may differ — fork it, rename it, edit what doesn't fit.
-
-If you want to version your own evolution:
+### 4. Cross-Platform Compilation Check
+Validate Android, KMP Common metadata, and native iOS simulator targets:
 
 ```bash
-cd ~/.claude
-git init   # tracks rules/, agents/, commands/, skills/, hooks/, scripts/
+./tools/verify_build.sh
 ```
 
 ---
 
-## Use as a template
+## 🤖 AI Agent Workflows
 
-If you want your own fork to start from, click **"Use this template"** at the top of the repo page (or `gh repo create <your-kit> --template hashirhamxa/claude-android-kit`).
+### Cursor
+Open the repository in Cursor. Scoped rules (`.cursor/rules/*.mdc`) activate automatically when editing relevant files:
+- Editing `*Screen.kt` attaches `02-compose-guidelines.mdc`.
+- Editing `commonMain/**/*.kt` attaches `03-kmp-guidelines.mdc`.
+- Editing `iosApp/**/*.swift` attaches `04-swiftui-interop.mdc`.
+
+### Claude Code
+Run Claude Code in your terminal. Use pre-configured custom slash commands:
+- `/scaffold-feature <name>`: Automatically builds `:domain`, `:data`, and `:ui` modules and registers them.
+- `/review-compose`: Audits Compose code for unstable lambdas, missing keys, and un-remembered objects.
+- `/verify`: Runs the cross-platform compile and test suite.
+
+### Google Antigravity
+Open the project with Google Antigravity. The `AGENT_WORKSPACE.md` and `.antigravity/gates/task_verification_gates.json` enforce:
+- Scope separation between `SharedCoreAgent`, `AndroidUiAgent`, and `IosNativeAgent`.
+- Blocking verification gates that prevent task completion if architecture rules fail.
 
 ---
 
-## License
+## 📋 Dependency Catalog Summary
 
-[MIT](./LICENSE) — use, modify, and share with attribution.
+| Category | Primary Library | Version | Role |
+| :--- | :--- | :--- | :--- |
+| **Toolchain** | Kotlin / AGP | `2.1.10` / `8.8.1` | K2 Compiler & Gradle plugins |
+| **UI** | Compose Multiplatform | `1.7.3` | Shared declarative UI |
+| **Navigation** | Navigation Compose | `2.8.7` | Type-safe navigation (`@Serializable`) |
+| **Network** | Ktor Client | `3.1.0` | Multiplatform networking (`OkHttp` + `Darwin`) |
+| **Database** | Room KMP | `2.7.0-alpha13` | SQLite-backed local persistence |
+| **DI** | Koin | `4.0.2` | Multiplatform Dependency Injection |
+| **iOS Interop** | SKIE | `0.10.1` | Swift Concurrency & `@Observable` bridge |
+| **Testing** | Turbine / Kotest | `1.2.0` / `5.9.1` | Coroutines Flow unit testing |
 
 ---
 
-## Author
+## 🧪 CI/CD Matrix Pipeline
 
-[Hashir Hamza](https://github.com/hashirhamxa) · Senior Android / KMP developer · [LinkedIn](https://linkedin.com/in/hashir-hamza-3130aa178/)
+All pull requests and commits run through a dual-runner matrix on GitHub Actions:
+- **Ubuntu Runner (`ubuntu-latest`):** Executes static architecture linting, Android builds, KMP metadata generation, and unit tests via `./gradlew testDebugUnitTest`.
+- **macOS Runner (`macos-14`):** Executes Apple Silicon iOS target framework compilation via `./gradlew compileKotlinIosSimulatorArm64`.
+
+---
+
+## 📄 License
+
+```text
+Copyright 2026 Hashir Hamza
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
