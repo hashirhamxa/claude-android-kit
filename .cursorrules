@@ -1,0 +1,549 @@
+### android-architecture.md
+
+# Android Architecture
+
+Clean Architecture + MVVM with **Manual DI via AppContainer**. No Hilt, no Koin, no Dagger. Ever.
+
+## Why manual DI
+
+- Compile-time verification without annotation processors.
+- Zero reflection, zero KSP overhead on clean builds.
+- Explicit dependency graph — reading `AppContainer.kt` tells you the whole app.
+- Trivial to swap implementations in tests (constructor injection only).
+
+If a project has a compelling reason to use Hilt, override this rule in that project's `CLAUDE.md`.
+
+## Module layering
+
+Every project has these logical layers, even if they live in the same Gradle module:
+
+```
+ui/            # Composables, view models, navigation
+domain/        # Use cases, domain models, repository interfaces
+data/          # Repository implementations, DAOs, network clients, mappers
+di/            # AppContainer, feature containers
+util/          # Pure utility functions, extensions
+```
+
+Dependencies only flow inward: `ui → domain ← data`. UI never imports data. Data never imports ui.
+
+## AppContainer pattern
+
+One top-level `AppContainer` owns app-scoped singletons (database, HTTP client, shared preferences). Feature-scoped containers hang off it.
+
+```kotlin
+interface AppContainer {
+    val db: AppDatabase
+    val httpClient: HttpClient
+    val transactionRepository: TransactionRepository
+    val smsParserContainer: SmsParserContainer
+}
+
+class DefaultAppContainer(context: Context) : AppContainer {
+    override val db: AppDatabase by lazy {
+        Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
+            .addMigrations(*AppDatabase.MIGRATIONS)
+            .build()
+    }
+
+    override val httpClient: HttpClient by lazy {
+        HttpClient(OkHttp) {
+            install(ContentNegotiation) { json() }
+            install(Logging) { level = LogLevel.HEADERS }
+        }
+    }
+
+    override val transactionRepository: TransactionRepository by lazy {
+        DefaultTransactionRepository(db.transactionDao(), Dispatchers.IO)
+    }
+
+    override val smsParserContainer: SmsParserContainer by lazy {
+        SmsParserContainer(transactionRepository)
+    }
+}
+```
+
+Attach to `Application`:
+
+```kotlin
+class App : Application() {
+    lateinit var container: AppContainer
+    override fun onCreate() {
+        super.onCreate()
+        container = DefaultAppContainer(this)
+    }
+}
+```
+
+Reach from composables via a `LocalAppContainer` `CompositionLocal`, or from Activities via `(application as App).container`.
+
+## ViewModel construction
+
+Use the modern AndroidX `viewModelFactory` with `initializer` DSL from `androidx.lifecycle.viewmodel`:
+
+```kotlin
+val transactionListViewModelFactory = viewModelFactory {
+    initializer {
+        val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as App)
+        TransactionListViewModel(app.container.transactionRepository)
+    }
+}
+```
+
+Or inject via composable route:
+
+```kotlin
+@Composable
+fun TransactionListRoute(
+    container: AppContainer = (LocalContext.current.applicationContext as App).container,
+    viewModel: TransactionListViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { TransactionListViewModel(container.transactionRepository) }
+        }
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TransactionListScreen(
+        uiState = uiState,
+        onItemClick = viewModel::onItemClick,
+        onRefresh = viewModel::onRefresh
+    )
+}
+```
+
+## MVVM & StateFlow rules
+
+- View models own `StateFlow<UiState>` and expose it as a read-only `StateFlow`.
+- `UiState` is a single immutable data class. No separate `isLoading`, `error`, `data` flows.
+- When combining or transforming repository flows, produce state with `SharingStarted.WhileSubscribed(5_000)`:
+  ```kotlin
+  val uiState: StateFlow<TransactionListUiState> = repository.observeTransactions()
+      .map { transactions -> TransactionListUiState(items = transactions.map { it.toUi() }, isLoading = false) }
+      .stateIn(
+          scope = viewModelScope,
+          started = SharingStarted.WhileSubscribed(5_000),
+          initialValue = TransactionListUiState(isLoading = true)
+      )
+  ```
+  *(The 5-second timeout preserves upstream subscriptions during configuration changes like screen rotations without leaking when backgrounded).*
+- View models take repository interfaces, never concrete implementations.
+- No Android framework types (`Context`, `Resources`, `View`) in view models. Ever.
+- `SavedStateHandle` for process-death-surviving state only, not for all state.
+
+```kotlin
+data class TransactionListUiState(
+    val items: List<TransactionUi> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: UiError? = null
+)
+```
+
+## Repository rules
+
+- Single source of truth = local DB. Network writes to DB, UI reads from DB.
+- Repository returns `Flow<T>` for observable data, `suspend fun` for one-shot operations.
+- Repository handles its own threading with `flowOn(Dispatchers.IO)`. Never pushes threading concerns up.
+- Network errors stay in the repository layer. Surface them as typed domain errors.
+
+## Use cases
+
+- Use cases are classes with a single `operator fun invoke(...)`.
+- One use case per business action. Don't group unrelated actions.
+- Use cases compose repositories; they don't compose other use cases unless there's genuine reuse.
+- If a use case is just a pass-through to a repository, skip it. Not every screen needs a use case layer.
+
+## Navigation & Edge-to-Edge
+
+- **Compose Type-Safe Navigation**: Routes are `@Serializable` objects or data classes using `kotlinx.serialization`.
+- Single Activity (`MainActivity`). No Fragments in new code.
+- Always call `enableEdgeToEdge()` in `MainActivity.onCreate()` (enforced by default on Android 15+).
+- Handle window insets explicitly in UI layouts using `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` or `Scaffold`.
+
+```kotlin
+// ui/nav/Routes.kt
+@Serializable object TransactionListRoute
+@Serializable data class TransactionDetailRoute(val transactionId: String)
+
+// NavHost setup
+NavHost(navController = navController, startDestination = TransactionListRoute) {
+    composable<TransactionListRoute> {
+        TransactionListRoute(onNavigateToDetail = { id ->
+            navController.navigate(TransactionDetailRoute(id))
+        })
+    }
+    composable<TransactionDetailRoute> { backStackEntry ->
+        val route: TransactionDetailRoute = backStackEntry.toRoute()
+        TransactionDetailRoute(transactionId = route.transactionId)
+    }
+}
+```
+
+## Package structure (feature-first)
+
+```
+com.hash.myapp/
+├── App.kt
+├── MainActivity.kt
+├── di/AppContainer.kt
+├── ui/
+│   ├── theme/
+│   ├── nav/
+│   ├── common/           # Shared composables
+│   └── transactions/     # Feature
+│       ├── list/
+│       ├── detail/
+│       └── TransactionsContainer.kt
+├── domain/
+│   ├── model/
+│   ├── repository/       # Interfaces
+│   └── usecase/
+└── data/
+    ├── local/
+    ├── remote/
+    └── repository/       # Implementations
+```
+
+Flat until it hurts. Don't pre-create folders for features that don't exist yet.
+
+
+---
+
+### compose-patterns.md
+
+<!-- Applies to both Jetpack Compose and Compose Multiplatform.
+     If a CMP-specific section grows significantly, split into android/compose.md + kmp/compose.md. -->
+# Compose Patterns
+
+Rules for Jetpack Compose and Compose Multiplatform. Apply the same way regardless of target.
+
+## State hoisting is non-negotiable
+
+Composables that display state take state as a parameter. They take callbacks for events. They do not own state unless they are the top of a feature and intentionally scoped that way.
+
+```kotlin
+// Good — stateless, reusable
+@Composable
+fun TransactionRow(
+    transaction: TransactionUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) { ... }
+
+// Bad — composable owns state that callers can't influence
+@Composable
+fun TransactionRow(transactionId: String) {
+    var transaction by remember { mutableStateOf<TransactionUi?>(null) }
+    LaunchedEffect(transactionId) { transaction = fetch(transactionId) } // NO
+    ...
+}
+```
+
+## Unidirectional data flow
+
+State flows down, events flow up. The view model owns state, the UI renders it, events come back as function calls on the view model.
+
+```kotlin
+@Composable
+fun TransactionListScreen(
+    uiState: TransactionListUiState,
+    onItemClick: (String) -> Unit,
+    onRefresh: () -> Unit,
+) { ... }
+
+@Composable
+fun TransactionListRoute(viewModel: TransactionListViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TransactionListScreen(
+        uiState = uiState,
+        onItemClick = viewModel::onItemClick,
+        onRefresh = viewModel::onRefresh,
+    )
+}
+```
+
+The `Route` composable wires the view model. The `Screen` composable is pure UI and previewable.
+
+## collectAsStateWithLifecycle, not collectAsState
+
+`collectAsStateWithLifecycle()` stops collecting when the screen is in the background. Use it everywhere for app state. `collectAsState()` is for composables that genuinely need to keep collecting off-screen, which is rare.
+
+## Side effects
+
+- `LaunchedEffect(key)` for suspending work tied to composition. Keys must fully capture when the effect should restart.
+- `DisposableEffect(key)` when you need cleanup.
+- `SideEffect` for pushing Compose state to non-Compose code on every composition.
+- `rememberCoroutineScope()` for launching from event callbacks.
+- Never call `suspend` functions directly in composition. Wrap them.
+
+Bad keys cause silent bugs. If the effect depends on nothing external, pass `Unit`:
+
+```kotlin
+LaunchedEffect(Unit) { viewModel.loadOnce() }
+```
+
+## remember & derivedStateOf
+
+- `remember` for values you compute once per composition.
+- `remember(key)` for values you recompute when the key changes.
+- `derivedStateOf` only when converting from multiple `State` inputs to a single derived `State` that changes less often than its inputs. If you're using it everywhere, you're probably using it wrong.
+
+## Recomposition hygiene & stability
+
+- **Kotlin 2.0+ Compose Compiler**: With Strong Skipping enabled by default, lambdas with unstable captures and composables with unstable parameters are automatically skippable.
+- Still annotate custom domain models crossing module boundaries with `@Immutable` or `@Stable` if they cannot be proven stable by the compiler.
+- Use `kotlinx.collections.immutable` (`ImmutableList`, `ImmutableSet`) instead of standard `List` for public composable state when stability guarantees are needed.
+- `derivedStateOf`: Only use when calculation reads at least one Compose `State` and changes *less frequently* than its input states (e.g., `derivedStateOf { listState.firstVisibleItemIndex > 0 }`). If inputs are plain values or change at the same rate, `remember(key)` is faster and avoids extra allocation.
+
+## One-off events (Snackbar, Navigation, Toasts)
+
+- Prefer modeling events as transient state in `UiState` with an `onDismiss` / `onHandled` callback to reset, or via a Kotlin `Channel<UiEvent>` / `SharedFlow` exposed from the ViewModel and collected with `LaunchedEffect`:
+
+```kotlin
+LaunchedEffect(viewModel.events) {
+    viewModel.events.collect { event ->
+        when (event) {
+            is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            is UiEvent.NavigateTo -> onNavigate(event.route)
+        }
+    }
+}
+```
+
+## Edge-to-edge & Window Insets (Android 15+)
+
+- Apps are edge-to-edge by default. Never assume system bars have fixed height.
+- Use `Scaffold` padding values:
+  ```kotlin
+  Scaffold(
+      topBar = { TopAppBar(title = { Text("Title") }) },
+      contentWindowInsets = WindowInsets.safeDrawing
+  ) { innerPadding ->
+      Box(modifier = Modifier.padding(innerPadding)) { ... }
+  }
+  ```
+- In custom layouts without `Scaffold`, use `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` or `WindowInsets.statusBars` / `WindowInsets.navigationBars`.
+
+## Modifier ordering matters
+
+Order of `Modifier` operations changes behavior. General order:
+
+```
+.size / .fillMaxX           // layout size
+.windowInsetsPadding(...)   // insets / safe drawing
+.clip(...)                  // shape
+.background(...)            // visual
+.border(...)                // visual
+.clickable { }              // input
+.padding(...)               // content spacing
+```
+
+Padding after clickable gives you a clickable area that includes padding. Padding before clickable doesn't. Choose deliberately.
+
+## Previews
+
+Every non-trivial composable gets a preview. Use a range of state:
+
+```kotlin
+@Preview(name = "Empty")
+@Preview(name = "Loading", showBackground = true)
+@Preview(name = "With data", showBackground = true)
+@Composable
+private fun TransactionListPreview() {
+    AppTheme {
+        TransactionListScreen(uiState = ..., onItemClick = {}, onRefresh = {})
+    }
+}
+```
+
+Previews are part of the review. A composable without a preview is incomplete.
+
+## Theme
+
+- One `AppTheme` composable, one `MaterialTheme`, one color/type/shape palette.
+- No hardcoded `Color()` or `sp` values in feature code. Everything through `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`.
+- Dark theme works. Verified in previews.
+- Dynamic color (`Material You`) on Android 12+, fall back to brand colors otherwise.
+
+## Navigation
+
+- Compose Navigation with serializable routes (`androidx.navigation.compose`).
+- Arguments are plain types or `@Serializable` data classes.
+- Back-stack-destructive actions (logout, reset) use `popUpTo` with `inclusive = true`.
+- Deep link routes live in `ui/nav/DeepLinks.kt`, not scattered.
+
+## Performance defaults
+
+- `LazyColumn`/`LazyRow` for lists. Never `Column` + `verticalScroll` for more than a handful of items.
+- `key = { it.id }` on every lazy list item. Missing keys are the #1 cause of scroll jank.
+- `contentType = { it.type }` for mixed item lists to maximize view composition reuse.
+- Use `rememberLazyListState` when you need to read or control scroll.
+- Images through `coil-compose` or Coil 3 multiplatform. Set an explicit `contentScale` and placeholder.
+
+
+---
+
+### kotlin-style.md
+
+# Kotlin Style
+
+Applies to all Kotlin code across Android, KMP, and shared modules.
+
+## Immutability first
+
+- Prefer `val` over `var`. Reach for `var` only inside short-lived local scopes.
+- Data classes for value types. Never use `var` properties in data classes.
+- Collections: use `listOf`, `mapOf`, `setOf` by default. `mutableListOf` only inside the function that builds the collection.
+- For state exposed to UI, use `StateFlow<ImmutableType>`. Treat every emission as a new value.
+
+## Null safety
+
+- No `!!` in production code. If you need it, refactor.
+- `?.let { }` for side effects on non-null. `?:` for fallbacks. Both chained for defaults + actions.
+- `requireNotNull` at boundaries where null is a bug, not a state.
+- Nullable return types mean "legitimately absent," not "I was too lazy to model the error."
+
+## Error handling
+
+- `Result<T>` or a sealed `Outcome<T>` wrapper at module boundaries. Exceptions inside a module, typed results across modules.
+- Never swallow `CancellationException`. Re-throw if you catch `Throwable`.
+- Domain errors are sealed classes, not strings.
+
+```kotlin
+sealed interface TransactionError {
+    data object DuplicateDetected : TransactionError
+    data class ParseFailed(val raw: String) : TransactionError
+    data class Unknown(val cause: Throwable) : TransactionError
+}
+```
+
+## Coroutines & Flow
+
+- Suspend at the edges (repositories, use cases). Keep domain logic non-suspending where possible.
+- Use structured concurrency. No `GlobalScope` outside of genuinely process-scoped work.
+- `Dispatchers.IO` for disk/network, `Dispatchers.Default` for CPU-bound, no explicit dispatcher for pure logic.
+- `StateFlow` for hot state with a current value. `SharedFlow` for events. Cold `Flow` for streams from storage/network.
+- Always use `flowOn` at the repository boundary, not in the view model.
+
+## Sealed types over enums when behavior differs
+
+- Enum when the variants are just labels.
+- Sealed interface/class when each variant carries different data or behavior.
+- Prefer `sealed interface` over `sealed class` unless you need state.
+
+## Scope functions — use with intent
+
+- `let` — transform nullable.
+- `run` — call methods on a receiver and return a result.
+- `apply` — configure an object, return it.
+- `also` — side effect (logging), return the original.
+- `with` — multiple calls on a non-null receiver.
+
+If the scope function adds no clarity, just write the plain code.
+
+## Imports
+
+- No wildcard imports (`import foo.*`). Explicit only.
+- Group: stdlib, third-party, project. Android Studio's default organizer is fine.
+
+## Formatting
+
+- 4-space indent (Kotlin standard, not 2).
+- Trailing commas on multi-line parameter lists.
+- Max line length 120.
+- `ktlint` or `detekt` in every project. Fail the build on violations.
+
+## Prefer these idioms
+
+- `buildList { }` over manual `mutableListOf` + `add` loops.
+- `when` expressions over long `if/else` chains.
+- Extension functions over static utility classes.
+- Top-level functions over singleton objects when there's no state.
+- `companion object` only when you genuinely need Java interop or reflection access.
+
+
+---
+
+### security.md
+
+<!-- Derived from rules/06-security.md during Phase 1 split.
+     Extends rules/common/security.md — install common/ alongside this file -->
+# Security
+
+## Secrets in Android builds
+
+- Expose via `BuildConfig`:
+
+```kotlin
+// app/build.gradle.kts
+val props = Properties().apply {
+    rootProject.file("local.properties").inputStream().use { load(it) }
+}
+buildConfigField("String", "SUPABASE_URL", "\"${props["supabase.url"]}\"")
+buildConfigField("String", "SUPABASE_ANON_KEY", "\"${props["supabase.anonKey"]}\"")
+```
+
+- `google-services.json` is public-ish but still not committed if the project is closed-source — prevents accidental config leaks between environments.
+
+## Network
+
+- No plaintext HTTP in the `networkSecurityConfig`. `cleartextTrafficPermitted="false"`.
+
+## Sensitive data at rest
+
+- `EncryptedSharedPreferences` (AndroidX Security) for tokens, user IDs, anything tied to identity.
+- Room tables with sensitive data: use SQLCipher via `SupportFactory` if the data warrants it (PII, financial, health).
+- Never log the content of notifications or SMS in TamaamPaisa-style parsing apps. Log metadata only (source, timestamp, type).
+
+## Auth tokens
+
+- Access tokens in memory only when possible; encrypted storage when persistence is needed.
+- Refresh tokens always encrypted at rest.
+- Biometric prompt (`androidx.biometric`) gates sensitive actions, not just app entry.
+- Token rotation on privilege-sensitive operations.
+
+## Logging
+
+- `Timber` on Android with `DebugTree()` only in debug builds.
+- Release builds: empty `Tree` that forwards errors to Crashlytics but logs nothing else.
+- Never log PII, tokens, or raw SMS/notification content.
+- Never log entire API responses.
+
+```kotlin
+if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
+else Timber.plant(CrashReportingTree())
+```
+
+## Android manifest & component hardening
+
+- `android:allowBackup="false"` unless you have a reason and have audited what's in the backup.
+- `android:usesCleartextTraffic="false"` (enforced in production).
+- `android:exported` explicit on every activity, service, receiver, provider. Missing attribute = build failure on modern AGP anyway.
+- Dynamic `BroadcastReceiver` registration on Android 14+ (API 34+) MUST specify export flags:
+  ```kotlin
+  ContextCompat.registerReceiver(
+      context,
+      receiver,
+      filter,
+      ContextCompat.RECEIVER_NOT_EXPORTED // Or RECEIVER_EXPORTED if intended for OS/external apps
+  )
+  ```
+- All `PendingIntent` instances MUST specify `PendingIntent.FLAG_IMMUTABLE` (unless mutable behavior is strictly required, in which case specify `PendingIntent.FLAG_MUTABLE` with explicit target package intent).
+- Intent filters scoped tightly — don't export receivers that don't need external access.
+
+## WebView hardening
+
+If WebViews are required:
+- `setAllowFileAccess(false)` and `setAllowContentAccess(false)`.
+- Enable JavaScript (`setJavaScriptEnabled(true)`) ONLY for strictly verified, HTTPS-only domains.
+- Never inject Javascript interfaces (`addJavascriptInterface`) pointing to privileged objects.
+
+## Native libraries & 16 KB page size (Android 15+)
+
+- Any native C/C++ libraries (`.so` dependencies, NDK binaries, third-party SDKs) must be built with 16 KB memory page alignment (`-Wl,-z,max-page-size=16384`).
+- Required for Google Play target SDK 35+ and Android 15 devices.
+
+## Permissions
+
+- Request the minimum.
+- Runtime permissions requested in context ("grant camera to scan receipt"), never on app launch.
+- SMS/notification permissions require a clear explanation on why — Play Store will reject otherwise.

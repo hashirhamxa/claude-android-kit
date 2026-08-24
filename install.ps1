@@ -138,6 +138,13 @@ if ($Profile -in @('core', 'full')) {
     if (Test-Path -LiteralPath (Split-Path -Parent $AntigravitySkills)) {
         Install-Tree (Join-Path $KitRoot 'skills') $AntigravitySkills
     }
+
+    # Also install globally for Cursor
+    $CursorRoot = Join-Path $HOME '.cursor'
+    if (Test-Path -LiteralPath $CursorRoot) {
+        Install-Tree (Join-Path $KitRoot 'agents') (Join-Path $CursorRoot 'agents')
+        Install-Tree (Join-Path $KitRoot 'skills') (Join-Path $CursorRoot 'skills-cursor')
+    }
 }
 
 # Hooks + Scripts -- full only (unless -WithoutHooks)
