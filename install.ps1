@@ -132,6 +132,12 @@ Install-Tree (Join-Path $KitRoot 'agents') (Join-Path $InstallRoot 'agents')
 if ($Profile -in @('core', 'full')) {
     Install-Tree (Join-Path $KitRoot 'commands') (Join-Path $InstallRoot 'commands')
     Install-Tree (Join-Path $KitRoot 'skills')   (Join-Path $InstallRoot 'skills')
+
+    # Also install globally for Google Antigravity
+    $AntigravitySkills = Join-Path $HOME '.gemini\config\skills'
+    if (Test-Path -LiteralPath (Split-Path -Parent $AntigravitySkills)) {
+        Install-Tree (Join-Path $KitRoot 'skills') $AntigravitySkills
+    }
 }
 
 # Hooks + Scripts -- full only (unless -WithoutHooks)
