@@ -5,8 +5,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 
-actual class DatabaseBuilderFactory(private val context: Context) {
-    actual fun createBuilder(): RoomDatabase.Builder<AppDatabase> {
+class AndroidDatabaseBuilderFactory(private val context: Context) : DatabaseBuilderFactory {
+    override fun createBuilder(): RoomDatabase.Builder<AppDatabase> {
         val appContext = context.applicationContext
         val dbFile = appContext.getDatabasePath("app_database.db")
         return Room.databaseBuilder<AppDatabase>(

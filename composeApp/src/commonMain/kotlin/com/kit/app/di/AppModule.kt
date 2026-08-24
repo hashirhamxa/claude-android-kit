@@ -3,7 +3,6 @@ package com.kit.app.di
 import com.kit.auth.data.repository.AuthRepositoryImpl
 import com.kit.auth.domain.repository.AuthRepository
 import com.kit.auth.ui.AuthViewModel
-import com.kit.core.database.DatabaseBuilderFactory
 import com.kit.core.network.HttpClientFactory
 import com.kit.core.network.createPlatformHttpClientEngine
 import org.koin.core.context.startKoin
@@ -19,7 +18,6 @@ val coreModule = module {
             baseUrl = "https://api.example.com"
         )
     }
-    single { DatabaseBuilderFactory() }
 }
 
 val featureAuthModule = module {

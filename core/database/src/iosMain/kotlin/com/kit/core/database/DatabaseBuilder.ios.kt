@@ -7,8 +7,8 @@ import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
 
-actual class DatabaseBuilderFactory {
-    actual fun createBuilder(): RoomDatabase.Builder<AppDatabase> {
+class IosDatabaseBuilderFactory : DatabaseBuilderFactory {
+    override fun createBuilder(): RoomDatabase.Builder<AppDatabase> {
         val documentDirectory = NSFileManager.defaultManager.URLForDirectory(
             directory = NSDocumentDirectory,
             inDomain = NSUserDomainMask,
@@ -16,7 +16,7 @@ actual class DatabaseBuilderFactory {
             create = false,
             error = null
         )
-        val dbFilePath = documentDirectory?.path + "/app_database.db"
+        val dbFilePath = (documentDirectory?.path ?: "") + "/app_database.db"
         return Room.databaseBuilder<AppDatabase>(
             name = dbFilePath,
             factory = { AppDatabaseConstructor.initialize() }
