@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+echo "🔍 [Git Hook] Running SSOT Architecture Validation..."
+
+if ! python3 tools/verify_architecture.py; then
+    echo ""
+    echo "❌ [Git Hook] Commit aborted: Resolve architecture violations listed above."
+    exit 1
+fi
+
+echo "✅ [Git Hook] SSOT architecture checks passed."
+exit 0

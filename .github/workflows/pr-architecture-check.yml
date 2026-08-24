@@ -1,0 +1,25 @@
+name: Architecture Linter Gate
+
+on:
+  pull_request:
+    paths:
+      - '**.kt'
+      - '**.swift'
+      - '.shared-rules/**'
+      - 'gradle/libs.versions.toml'
+
+jobs:
+  lint:
+    name: Verify Zero Rule Violations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Rule Verification
+        run: python3 tools/verify_architecture.py
