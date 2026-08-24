@@ -73,3 +73,12 @@ LazyColumn(modifier = Modifier.fillMaxSize()) {
     }
 }
 ```
+
+## 6. Zero Direct IPC & Heavy I/O in UI Layer
+- **Ban Heavy I/O in Composables:** Direct `packageManager` queries, bitmap decoding (`BitmapFactory`), and disk I/O inside `@Composable` functions or `remember` blocks are prohibited.
+- **Repository / Cache Offload:** All heavy asset loads, icon decodes, and package queries must live in a `Repository` or `Cache` running on `Dispatchers.IO`.
+
+## 7. Multi-Button Stacking & Header Overflow
+- **Row Constraints:** Never place 3+ buttons in an unconstrained `Row` without `Modifier.weight(1f)`. For multi-action dialogs or empty states, use vertical `Column`s with `fillMaxWidth()`.
+- **Text Overflow:** All `TopAppBar` titles and list headers must specify `maxLines = 1` and `overflow = TextOverflow.Ellipsis`.
+

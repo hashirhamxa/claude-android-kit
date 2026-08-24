@@ -1,6 +1,7 @@
 package com.kit.app
 
 import com.lemonappdev.konsist.api.Konsist
+import com.lemonappdev.konsist.api.ext.list.withAnnotationOf
 import com.lemonappdev.konsist.api.ext.list.withNameEndingWith
 import com.lemonappdev.konsist.api.ext.list.withoutName
 import com.lemonappdev.konsist.api.verify.assertFalse
@@ -21,6 +22,51 @@ class ArchitectureKonsistTest {
             ) {
                 it.name.startsWith("android.") ||
                 it.name == "androidx.compose.ui.platform.LocalContext"
+            }
+    }
+
+    @Test
+    fun `composable functions must not import heavy IPC or IO classes`() {
+        Konsist
+            .scopeFromProduction()
+            .files
+            .filter { it.hasFunction { func -> func.hasAnnotation { anno -> anno.name == "Composable" } } }
+            .imports
+            .assertFalse(
+                additionalMessage = "Heavy I/O & IPC (PackageManager, BitmapFactory) are banned in Compose UI files. Offload to Repository/Cache."
+            ) {
+                it.name.startsWith("android.content.pm.PackageManager") ||
+                it.name.startsWith("android.graphics.BitmapFactory")
+            }
+    }
+
+    @Test
+    fun `ui state models must be immutable data class or sealed interface`() {
+        Konsist
+            .scopeFromProduction()
+            .classes
+            .withNameEndingWith("UiState")
+            .properties()
+            .assertFalse(
+                additionalMessage = "UiState fields must be strictly read-only (val). Mutable var properties are prohibited."
+            ) {
+                it.hasVarModifier
+            }
+    }
+
+    @Test
+    fun `viewmodels must not directly reference DAOs or network HTTP clients`() {
+        Konsist
+            .scopeFromProduction()
+            .classes
+            .withNameEndingWith("ViewModel")
+            .imports
+            .assertFalse(
+                additionalMessage = "ViewModels must only depend on Domain UseCases or Repositories. Direct DAO and HttpClient references are banned."
+            ) {
+                it.name.endsWith("Dao") ||
+                it.name.endsWith("HttpClient") ||
+                it.name.contains(".data.source.")
             }
     }
 

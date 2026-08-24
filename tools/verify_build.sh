@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+MODULE_TARGET="${1:-all}"
+
 echo "======================================================="
-echo "🛠️  Running Cross-Platform Compilation & Test Verification"
+echo "🛠️  Cross-Platform Compilation & Test Verification"
+echo "📦 Target Scope: ${MODULE_TARGET}"
 echo "======================================================="
 
 # 1. Detect Python Command
@@ -23,17 +26,20 @@ else
 fi
 
 # 2. Check Android & Common compilation
-echo "==> Compiling Android & Shared Common Kotlin..."
-./gradlew compileDebugKotlin compileKotlinMetadata
+if [ "$MODULE_TARGET" != "all" ]; then
+    echo "==> Scoped Module Build: ${MODULE_TARGET}..."
+    ./gradlew "${MODULE_TARGET}:compileDebugKotlin" --stacktrace
+else
+    echo "==> Compiling Android & Shared Common Kotlin..."
+    ./gradlew compileDebugKotlin compileKotlinMetadata --stacktrace
 
-# 3. Check iOS Simulator Target compilation
-echo "==> Compiling iOS Simulator Target (KMP Native)..."
-./gradlew compileKotlinIosSimulatorArm64
+    echo "==> Compiling iOS Simulator Target (KMP Native)..."
+    ./gradlew compileKotlinIosSimulatorArm64 --stacktrace
 
-# 4. Run Common Unit Tests with Turbine & Konsist
-echo "==> Executing Common & Android Unit Tests..."
-./gradlew testDebugUnitTest
+    echo "==> Executing Common & Android Unit Tests (with Konsist)..."
+    ./gradlew testDebugUnitTest --stacktrace
+fi
 
 echo "======================================================="
-echo "✅ All platform targets and tests compiled successfully!"
+echo "✅ Verification checks completed successfully!"
 echo "======================================================="
