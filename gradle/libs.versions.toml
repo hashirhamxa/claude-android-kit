@@ -26,10 +26,11 @@ koin-compose = "4.0.2"
 # iOS Interop & Architecture Tooling
 skie = "0.10.1"
 
-# Testing & Quality
+# Testing, Architecture Linting & Quality
 turbine = "1.2.0"
 kotest = "5.9.1"
 mockative = "3.0.1"
+konsist = "0.17.3"
 
 [libraries]
 # --- Kotlin & Coroutines ---
@@ -71,10 +72,11 @@ koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin-compose" }
 koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin-compose" }
 
-# --- Testing ---
+# --- Testing & Architecture ---
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 mockative = { module = "io.mockative:mockative", version.ref = "mockative" }
+konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 
 # --- Build-Logic Dependencies (For Custom Gradle Plugins) ---
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }

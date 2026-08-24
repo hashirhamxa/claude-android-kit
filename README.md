@@ -8,7 +8,7 @@
 [![Compose Multiplatform](https://img.shields.io/badge/Compose_Multiplatform-1.7.3-4285F4.svg?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 [![Swift](https://img.shields.io/badge/Swift-6.0-F05138.svg?logo=swift&logoColor=white)](https://swift.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Release-v1.0.0-green.svg)](VERSION)
+[![Version](https://img.shields.io/badge/Release-v1.1.0-green.svg)](VERSION)
 
 **A production-grade mobile architecture and AI developer toolkit bridging Jetpack Compose, Kotlin Multiplatform (KMP), Android Native, and Native iOS (SwiftUI).**  
 *Engineered to eliminate LLM hallucinations and code drift across Claude Code, Cursor, and Google Antigravity.*
@@ -22,7 +22,11 @@
 Bootstrap a brand-new project with package renaming, git initialization, and architecture hooks in one command:
 
 ```bash
+# Enterprise 3-Tier Architecture
 curl -sSL https://raw.githubusercontent.com/hashirhamxa/claude-android-kit/main/init.sh | bash -s my-awesome-app com.mycompany.app
+
+# Lightweight / Single-Module Feature Profile
+curl -sSL https://raw.githubusercontent.com/hashirhamxa/claude-android-kit/main/init.sh | bash -s my-awesome-app com.mycompany.app --lightweight
 ```
 
 ---
@@ -139,8 +143,10 @@ Open the project with Google Antigravity. `AGENT_WORKSPACE.md` and `.antigravity
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| **Scaffold Feature** | `python tools/scaffold_feature.py <name> [pkg]` | Generates `:domain`, `:data`, and `:ui` modules |
-| **Lint Architecture** | `python tools/verify_architecture.py` | Statically checks for SSOT rule violations |
+| **Scaffold Feature (3-Tier)** | `python tools/scaffold_feature.py <name> [pkg]` | Generates enterprise `:domain`, `:data`, and `:ui` modules |
+| **Scaffold Feature (Lightweight)** | `python tools/scaffold_feature.py <name> -l` | Generates single-module `:feature:<name>` for fast MVPs |
+| **Lint Architecture (Static)** | `python tools/verify_architecture.py` | Fast static check for SSOT rule violations (comments-stripped) |
+| **Lint Architecture (Semantic)**| `./gradlew testDebugUnitTest` | Runs Konsist AST-level architectural unit tests |
 | **Verify Builds** | `./tools/verify_build.sh` | Compiles Android, KMP Common, iOS Simulator & tests |
 | **Claude Scaffold** | `/scaffold-feature <name>` | In-chat slash command for module generation |
 | **Claude Compose Audit**| `/review-compose` | In-chat audit for Compose anti-patterns |

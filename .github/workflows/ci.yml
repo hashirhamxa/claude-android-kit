@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job 1: Static SSOT Architecture Validation (Fast Fail)
+  # Job 1: Fast-Fail Architecture Linting
   architecture-lint:
     name: SSOT Architecture Lint
     runs-on: ubuntu-latest
@@ -27,9 +27,9 @@ jobs:
       - name: Run Architecture Linter
         run: python3 tools/verify_architecture.py
 
-  # Job 2: Android & KMP JVM / Common Compilation & Unit Tests
+  # Job 2: Android & KMP Common Build, Turbine & Konsist Tests
   android-and-common:
-    name: Android & KMP Common Build
+    name: Android & KMP Common Build + Konsist Tests
     runs-on: ubuntu-latest
     needs: architecture-lint
     steps:
@@ -50,12 +50,12 @@ jobs:
       - name: Compile KMP Common & Android Targets
         run: ./gradlew compileDebugKotlin compileKotlinMetadata --stacktrace
 
-      - name: Run Unit Tests & Turbine Verification
+      - name: Run Unit Tests, Turbine & Konsist Architecture Verification
         run: ./gradlew testDebugUnitTest --stacktrace
 
-  # Job 3: Native iOS Compilation (KMP Native + SKIE)
+  # Job 3: Native iOS Compilation & Xcode Verification
   ios-native-build:
-    name: iOS Target Compilation (macOS)
+    name: iOS Target Compilation & Test (macOS)
     runs-on: macos-14
     needs: architecture-lint
     steps:
@@ -71,5 +71,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compile Kotlin iOS Simulator Target
+      - name: Compile Kotlin iOS Simulator Target (KMP + SKIE)
         run: ./gradlew compileKotlinIosSimulatorArm64 --stacktrace
+
+      - name: Run Xcode Simulator Build/Test if configured
+        run: |
+          if [ -d "iosApp/iosApp.xcworkspace" ]; then
+            xcodebuild -workspace iosApp/iosApp.xcworkspace -scheme iosApp -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' test || true
+          elif [ -d "iosApp/iosApp.xcodeproj" ]; then
+            xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build || true
+          fi

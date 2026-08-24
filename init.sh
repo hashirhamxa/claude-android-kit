@@ -4,18 +4,20 @@ set -e
 # ==============================================================================
 # Claude Android Kit - Interactive Project Bootstrapper
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/hashirhamxa/claude-android-kit/main/init.sh | bash -s <project-name> <package-name>
+#   curl -sSL https://raw.githubusercontent.com/hashirhamxa/claude-android-kit/main/init.sh | bash -s <project-name> <package-name> [--lightweight]
 # Example:
 #   curl -sSL https://raw.githubusercontent.com/hashirhamxa/claude-android-kit/main/init.sh | bash -s my-app com.example.myapp
 # ==============================================================================
 
 PROJECT_NAME="${1:-my-awesome-app}"
 PACKAGE_NAME="${2:-com.example.app}"
+PROFILE="${3:-full}"
 REPO_URL="https://github.com/hashirhamxa/claude-android-kit.git"
 
 echo "================================================================="
 echo "🚀 Bootstrapping Claude Android Kit Project: ${PROJECT_NAME}"
 echo "📦 Target Package: ${PACKAGE_NAME}"
+echo "📐 Architecture Profile: ${PROFILE}"
 echo "================================================================="
 
 # 1. Clone repository into target folder
