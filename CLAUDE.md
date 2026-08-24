@@ -8,10 +8,18 @@ All development must strictly adhere to the single source of truth rules located
 - `04-swiftui-interop.md`: SKIE bridge, Swift 6 concurrency, Observable wrappers.
 - `05-testing-verification.md`: Turbine flow testing, test conventions.
 
+## Spec-Driven Development (OpenSpec)
+- OpenSpec Living Specs: `openspec/specs/`
+- Propose New Feature/Change: `/opsx:propose <name>` or `python tools/openspec_manager.py propose <name>`
+- Apply Active Checklist: `/opsx:apply <change-id>`
+- Verify Quality Gates: `/opsx:verify` or `./tools/verify_build.sh`
+- Archive & Merge Delta Specs: `/opsx:archive <change-id>`
+- Lightweight Bug Fix: `/opsx:quickfix <name>`
+
 ## Build & Verification Commands
 - Check Android & KMP Compilation: `./gradlew compileDebugKotlin compileKotlinIosSimulatorArm64`
-- Run All Common Unit Tests: `./gradlew allTests` or `./gradlew testDebugUnitTest`
-- Lint & Code Style: `./gradlew ktlintCheck` or `./gradlew detekt`
+- Run All Unit & Konsist Architecture Tests: `./gradlew testDebugUnitTest`
+- Lint Architecture: `python tools/verify_architecture.py`
 
 ## Core Rules
 1. Never introduce raw string navigation routes (must use `@Serializable`).

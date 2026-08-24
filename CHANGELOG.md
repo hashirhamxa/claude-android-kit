@@ -3,6 +3,8 @@
 ## [1.1.0] -- 2026-08-24
 
 ### Added
+- **OpenSpec Spec-Driven Development (SDD) Engine**: Integrated the 5-stage SDD lifecycle (`explore` ──▶ `propose` ──▶ `apply` ──▶ `verify` ──▶ `archive`) with living specs in `openspec/specs/`, change proposals in `openspec/changes/`, and global context anchor in `openspec/project.md`.
+- **OpenSpec Slash Commands & Tooling**: Added `/opsx:propose`, `/opsx:apply`, `/opsx:verify`, `/opsx:archive`, and `/opsx:quickfix` with Python automation CLI (`tools/openspec_manager.py`) and dedicated agent `@openspec-planner`.
 - **Konsist Architecture Unit Testing Suite**: Added `com.lemonappdev:konsist` to `gradle/libs.versions.toml` and implemented `ArchitectureKonsistTest.kt` in `composeApp/src/commonTest/` to verify semantic boundaries, zero Android imports in `commonMain`, ViewModels exposing read-only `StateFlow`, and repository package encapsulation.
 - **Lightweight / Single-Module Feature Profile**: Enhanced `tools/scaffold_feature.py` with `--lightweight` (`-l`) flag to scaffold unified `:feature:<name>` modules for fast hackathons, utility screens, and MVPs alongside enterprise 3-tier architectures.
 - **Enhanced Static Linter**: Upgraded `tools/verify_architecture.py` with automatic block comment, line comment, and string literal stripping to eliminate regex false positives, plus aliased import detection.
