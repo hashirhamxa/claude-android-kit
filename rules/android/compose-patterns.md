@@ -75,12 +75,41 @@ LaunchedEffect(Unit) { viewModel.loadOnce() }
 - `remember(key)` for values you recompute when the key changes.
 - `derivedStateOf` only when converting from multiple `State` inputs to a single derived `State` that changes less often than its inputs. If you're using it everywhere, you're probably using it wrong.
 
-## Recomposition hygiene
+## Recomposition hygiene & stability
 
-- No lambdas that capture unstable state inline in hot paths. Hoist them.
-- No `mutableStateListOf` when `ImmutableList` + state replacement would work (use `kotlinx.collections.immutable`).
-- Annotate custom types with `@Immutable` or `@Stable` when the compiler can't prove stability.
-- Use the Compose Compiler metrics report to find recomposition hot spots. Don't guess.
+- **Kotlin 2.0+ Compose Compiler**: With Strong Skipping enabled by default, lambdas with unstable captures and composables with unstable parameters are automatically skippable.
+- Still annotate custom domain models crossing module boundaries with `@Immutable` or `@Stable` if they cannot be proven stable by the compiler.
+- Use `kotlinx.collections.immutable` (`ImmutableList`, `ImmutableSet`) instead of standard `List` for public composable state when stability guarantees are needed.
+- `derivedStateOf`: Only use when calculation reads at least one Compose `State` and changes *less frequently* than its input states (e.g., `derivedStateOf { listState.firstVisibleItemIndex > 0 }`). If inputs are plain values or change at the same rate, `remember(key)` is faster and avoids extra allocation.
+
+## One-off events (Snackbar, Navigation, Toasts)
+
+- Prefer modeling events as transient state in `UiState` with an `onDismiss` / `onHandled` callback to reset, or via a Kotlin `Channel<UiEvent>` / `SharedFlow` exposed from the ViewModel and collected with `LaunchedEffect`:
+
+```kotlin
+LaunchedEffect(viewModel.events) {
+    viewModel.events.collect { event ->
+        when (event) {
+            is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            is UiEvent.NavigateTo -> onNavigate(event.route)
+        }
+    }
+}
+```
+
+## Edge-to-edge & Window Insets (Android 15+)
+
+- Apps are edge-to-edge by default. Never assume system bars have fixed height.
+- Use `Scaffold` padding values:
+  ```kotlin
+  Scaffold(
+      topBar = { TopAppBar(title = { Text("Title") }) },
+      contentWindowInsets = WindowInsets.safeDrawing
+  ) { innerPadding ->
+      Box(modifier = Modifier.padding(innerPadding)) { ... }
+  }
+  ```
+- In custom layouts without `Scaffold`, use `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` or `WindowInsets.statusBars` / `WindowInsets.navigationBars`.
 
 ## Modifier ordering matters
 
@@ -88,11 +117,12 @@ Order of `Modifier` operations changes behavior. General order:
 
 ```
 .size / .fillMaxX           // layout size
+.windowInsetsPadding(...)   // insets / safe drawing
 .clip(...)                  // shape
 .background(...)            // visual
 .border(...)                // visual
 .clickable { }              // input
-.padding(...)               // spacing
+.padding(...)               // content spacing
 ```
 
 Padding after clickable gives you a clickable area that includes padding. Padding before clickable doesn't. Choose deliberately.
@@ -124,7 +154,7 @@ Previews are part of the review. A composable without a preview is incomplete.
 
 ## Navigation
 
-- Compose Navigation with serializable routes.
+- Compose Navigation with serializable routes (`androidx.navigation.compose`).
 - Arguments are plain types or `@Serializable` data classes.
 - Back-stack-destructive actions (logout, reset) use `popUpTo` with `inclusive = true`.
 - Deep link routes live in `ui/nav/DeepLinks.kt`, not scattered.
@@ -132,6 +162,7 @@ Previews are part of the review. A composable without a preview is incomplete.
 ## Performance defaults
 
 - `LazyColumn`/`LazyRow` for lists. Never `Column` + `verticalScroll` for more than a handful of items.
-- `key = { it.id }` on every lazy list. Missing keys are the #1 cause of scroll jank.
+- `key = { it.id }` on every lazy list item. Missing keys are the #1 cause of scroll jank.
+- `contentType = { it.type }` for mixed item lists to maximize view composition reuse.
 - Use `rememberLazyListState` when you need to read or control scroll.
 - Images through `coil-compose` or Coil 3 multiplatform. Set an explicit `contentScale` and placeholder.

@@ -74,6 +74,22 @@ A vague finding is less useful than a precise one. "TokenStore.kt:42 stores the 
 
 Flag any token stored at a lower sensitivity level than its scope warrants. A refresh token in plain `SharedPreferences` is blocking; a display-name preference in plain `SharedPreferences` is not a finding.
 
+### IPC, Intents & Components (Android 14+)
+
+- [ ] All dynamic `BroadcastReceiver` registrations via `ContextCompat.registerReceiver` explicitly declare `RECEIVER_NOT_EXPORTED` or `RECEIVER_EXPORTED` (required on Android 14+ / API 34+; missing flag causes runtime crash).
+- [ ] All `PendingIntent` declarations explicitly set `PendingIntent.FLAG_IMMUTABLE`. If `FLAG_MUTABLE` is strictly needed (e.g., inline notification replies), the base `Intent` must have its target component/package explicitly set to avoid hijacking.
+- [ ] Deep-link handlers do not execute privileged actions directly from intent parameters without re-authenticating or confirming with the user.
+
+### WebViews
+
+- [ ] `setAllowFileAccess(false)` and `setAllowContentAccess(false)` are set on all `WebSettings`.
+- [ ] `setJavaScriptEnabled(true)` is only enabled when strictly necessary and traffic is restricted to validated HTTPS hosts.
+- [ ] No `addJavascriptInterface` binds objects containing sensitive methods or credentials.
+
+### Native binaries & 16 KB page size (Android 15+)
+
+- [ ] All native C/C++ libraries (`.so` dependencies, NDK code) are built with 16 KB page size alignment (`-Wl,-z,max-page-size=16384`). Absence will cause crashes on Android 15 devices and rejection on Google Play (Target SDK 35+).
+
 ### ProGuard / R8 security
 
 - [ ] `keepattributes SourceFile,LineNumberTable` is absent from the release ProGuard config. Source file names in stack traces help attackers reverse-engineer the app; they belong in a private mapping file, not the binary.
@@ -96,10 +112,14 @@ Flag any token stored at a lower sensitivity level than its scope warrants. A re
 - Secrets committed to source control (rotate keys immediately)
 - Cleartext traffic permitted globally in release network config
 - Token or credential stored in plain `SharedPreferences`
+- Dynamic `BroadcastReceiver` registered without `RECEIVER_NOT_EXPORTED`/`RECEIVER_EXPORTED` on API 34+
+- `PendingIntent` without `FLAG_IMMUTABLE`
 
 **Risk — address or document the deferral:**
 - Missing certificate pinning on auth endpoints
 - Backup not scoped to exclude sensitive data
+- WebViews with `allowFileAccess` enabled
+- Unverified 16 KB page size compatibility in native `.so` dependencies
 - Log statements emitting non-critical PII (names, emails) in debug builds
 - Missing `-printmapping` storage policy
 - Dependency not yet checked against CVE database

@@ -1,0 +1,39 @@
+{
+  "name": "claude-android-kit",
+  "version": "0.2.1",
+  "description": "Opinionated engineering starter kit & agent harness for Android & Kotlin Multiplatform (Clean Architecture + MVVM, Manual DI, Jetpack Compose / Compose Multiplatform, Room / SQLDelight, Ktor)",
+  "author": {
+    "name": "Hashir Hamza",
+    "url": "https://github.com/hashirhamxa"
+  },
+  "homepage": "https://github.com/hashirhamxa/claude-android-kit",
+  "repository": "https://github.com/hashirhamxa/claude-android-kit",
+  "license": "MIT",
+  "keywords": [
+    "android",
+    "kotlin",
+    "kmp",
+    "cmp",
+    "jetpack-compose",
+    "compose-multiplatform",
+    "clean-architecture",
+    "claude-code",
+    "agents",
+    "skills",
+    "rules"
+  ],
+  "userConfig": {
+    "hooks_enabled": {
+      "type": "boolean",
+      "title": "Enable CAK hooks",
+      "description": "Enable release build guardrails, manifest auditing, and session persistence.",
+      "default": true
+    }
+  },
+  "skills": [
+    "./skills/"
+  ],
+  "commands": [
+    "./commands/"
+  ]
+}

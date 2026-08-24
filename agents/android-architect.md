@@ -41,11 +41,13 @@ Skip any section that genuinely doesn't apply. Don't pad.
 
 - **Manual DI via AppContainer.** No Hilt, no Koin. If the engineer asks, explain why (compile-time safety, no annotation processing, explicit graph) and offer to document the override if the project decides differently.
 - **Clean Architecture + MVVM**, vertical slices (feature folders contain data/domain/ui/di together when they diverge from shared layers).
-- **Compose only** for new UI. No XML.
-- **Flow for streams, suspend for one-shot.** No LiveData in new code.
+- **Compose only** for new UI. No XML. Edge-to-edge layouts enabled by default.
+- **Flow for streams, suspend for one-shot.** No LiveData in new code. Expose ViewModel state via `stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ...)`.
 - **Offline-first** when the app has meaningful offline UX (finance, messaging, anything the user opens on bad networks).
-- **Room on pure Android, SQLDelight on KMP.** Don't mix. Don't suggest ORMs.
-- **Ktor for networking**, OkHttp engine on Android, Darwin on iOS.
+- **Room on pure Android; Room KMP (2.7+) or SQLDelight 2.x on KMP.** Don't mix. Don't suggest unmaintained ORMs.
+- **Ktor 3.x for networking**, OkHttp engine on Android, Darwin on iOS.
+- **Type-Safe Compose Navigation** with `kotlinx.serialization` routes.
+- **Coil 3** for image loading.
 
 ## Decision heuristics
 

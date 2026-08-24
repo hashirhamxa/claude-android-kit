@@ -10,7 +10,7 @@ const {
 const HOOK_ID = 'cak:release-guard';
 
 function isBlockedReleaseCommand(command) {
-  return command.includes(':app:installRelease') || command.includes('assembleRelease');
+  return /\b(assembleRelease|bundleRelease|packageRelease|installRelease|publish\w*Release)\b/i.test(command);
 }
 
 function main() {

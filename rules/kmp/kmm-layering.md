@@ -61,21 +61,24 @@ Use the shared-logic / shared-ui split when some platform targets use native UI 
 ## What goes in commonMain
 
 - Domain models, use cases, repository interfaces.
-- Ktor clients (Ktor is fully multiplatform).
-- SQLDelight queries and generated code.
+- Ktor 3.x HTTP clients (fully multiplatform).
+- Local storage: **Room KMP (AndroidX Room 2.7+)** or **SQLDelight 2.x**.
+- Compose Multiplatform UI, ViewModels (`androidx.lifecycle.viewmodel.compose`), and CMP Resource components (`Res.drawable.*`, `Res.string.*`).
+- Image loading with **Coil 3 Multiplatform**.
 - Business logic that doesn't depend on platform APIs.
-- Kotlinx.serialization, kotlinx.coroutines, kotlinx.datetime.
+- `kotlinx.serialization`, `kotlinx.coroutines`, `kotlinx.datetime`, `kotlinx.collections.immutable`.
 
 If it compiles without `expect`, it belongs in `commonMain`.
 
 ## What goes in platform mains
 
-- SQLDelight driver (`AndroidSqliteDriver` vs. `NativeSqliteDriver`).
-- Ktor engine (`OkHttp` on Android, `Darwin` on iOS).
-- Settings/preferences (`multiplatform-settings` with platform constructors).
-- File system access.
-- Platform-specific auth (Firebase SDK on Android, native on iOS).
-- Biometric/secure storage.
+- Database builders/drivers:
+  - Room KMP: `Room.databaseBuilder<AppDatabase>()` with `BundledSQLiteDriver` (or platform specific instantiation).
+  - SQLDelight: `AndroidSqliteDriver` vs `NativeSqliteDriver`.
+- Ktor engine: `OkHttp` on Android, `Darwin` on iOS, `CIO` on Desktop.
+- Settings/preferences: `multiplatform-settings` with platform constructors or DataStore KMP.
+- File system access: `okio.Path` or `kotlinx.io`.
+- Platform-specific auth & biometric storage: Android Keystore vs iOS Keychain.
 
 ## expect / actual discipline
 

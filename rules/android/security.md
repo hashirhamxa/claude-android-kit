@@ -46,12 +46,34 @@ if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
 else Timber.plant(CrashReportingTree())
 ```
 
-## Android manifest hardening
+## Android manifest & component hardening
 
 - `android:allowBackup="false"` unless you have a reason and have audited what's in the backup.
-- `android:usesCleartextTraffic="false"`.
+- `android:usesCleartextTraffic="false"` (enforced in production).
 - `android:exported` explicit on every activity, service, receiver, provider. Missing attribute = build failure on modern AGP anyway.
+- Dynamic `BroadcastReceiver` registration on Android 14+ (API 34+) MUST specify export flags:
+  ```kotlin
+  ContextCompat.registerReceiver(
+      context,
+      receiver,
+      filter,
+      ContextCompat.RECEIVER_NOT_EXPORTED // Or RECEIVER_EXPORTED if intended for OS/external apps
+  )
+  ```
+- All `PendingIntent` instances MUST specify `PendingIntent.FLAG_IMMUTABLE` (unless mutable behavior is strictly required, in which case specify `PendingIntent.FLAG_MUTABLE` with explicit target package intent).
 - Intent filters scoped tightly — don't export receivers that don't need external access.
+
+## WebView hardening
+
+If WebViews are required:
+- `setAllowFileAccess(false)` and `setAllowContentAccess(false)`.
+- Enable JavaScript (`setJavaScriptEnabled(true)`) ONLY for strictly verified, HTTPS-only domains.
+- Never inject Javascript interfaces (`addJavascriptInterface`) pointing to privileged objects.
+
+## Native libraries & 16 KB page size (Android 15+)
+
+- Any native C/C++ libraries (`.so` dependencies, NDK binaries, third-party SDKs) must be built with 16 KB memory page alignment (`-Wl,-z,max-page-size=16384`).
+- Required for Google Play target SDK 35+ and Android 15 devices.
 
 ## Permissions
 

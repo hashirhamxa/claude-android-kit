@@ -211,6 +211,99 @@ function cmdUninstall() {
   process.stdout.write(`CAK uninstalled (${removed} files removed, ${gone} already absent).\n`);
 }
 
+function cmdAudit(argv) {
+  const targetDir = process.cwd();
+  process.stdout.write(`\n🔍 Auditing Android/KMP project at: ${targetDir}\n\n`);
+
+  let issues = 0;
+  let checks = 0;
+
+  // 1. Check version catalog
+  const tomlPath = path.join(targetDir, 'gradle', 'libs.versions.toml');
+  if (fs.existsSync(tomlPath)) {
+    checks++;
+    const tomlContent = fs.readFileSync(tomlPath, 'utf8');
+    process.stdout.write('  [OK] Version catalog found (gradle/libs.versions.toml)\n');
+
+    if (tomlContent.includes('androidx.compose.compiler') && !tomlContent.includes('kotlin.plugin.compose')) {
+      process.stdout.write('  [WARN] Using standalone androidx.compose.compiler. Consider migrating to Kotlin 2.0+ compose plugin (org.jetbrains.kotlin.plugin.compose).\n');
+      issues++;
+    }
+  }
+
+  // 2. Check AndroidManifest.xml files recursively or in standard locations
+  const manifestPaths = [
+    path.join(targetDir, 'app', 'src', 'main', 'AndroidManifest.xml'),
+    path.join(targetDir, 'androidApp', 'src', 'main', 'AndroidManifest.xml'),
+    path.join(targetDir, 'src', 'androidMain', 'AndroidManifest.xml'),
+  ];
+
+  for (const mf of manifestPaths) {
+    if (fs.existsSync(mf)) {
+      checks++;
+      const content = fs.readFileSync(mf, 'utf8');
+      process.stdout.write(`  [OK] Manifest found: ${path.relative(targetDir, mf)}\n`);
+
+      if (/android:debuggable\s*=\s*"true"/i.test(content)) {
+        process.stdout.write('  [FAIL] Hardcoded android:debuggable="true" in manifest.\n');
+        issues++;
+      }
+      if (/android:usesCleartextTraffic\s*=\s*"true"/i.test(content)) {
+        process.stdout.write('  [WARN] android:usesCleartextTraffic="true" enabled. Restrict HTTP to debug builds.\n');
+        issues++;
+      }
+      if (/<activity\b[^>]*<intent-filter\b/i.test(content) && !/android:exported\s*=/i.test(content)) {
+        process.stdout.write('  [FAIL] Manifest components with intent-filters missing explicit android:exported.\n');
+        issues++;
+      }
+    }
+  }
+
+  // 3. Check for committed sensitive files
+  const sensitiveFiles = ['google-services.json', 'GoogleService-Info.plist', 'release.keystore', 'release.jks'];
+  for (const sf of sensitiveFiles) {
+    if (fs.existsSync(path.join(targetDir, sf)) || fs.existsSync(path.join(targetDir, 'app', sf))) {
+      process.stdout.write(`  [FAIL] Potentially sensitive file tracked in workspace: ${sf}\n`);
+      issues++;
+    }
+  }
+
+  process.stdout.write(`\nAudit complete: ${checks} checks run, ${issues} issue(s) found.\n\n`);
+}
+
+function cmdExport(argv) {
+  const target = argv[0] || 'all';
+  const targetDir = process.cwd();
+  const rules = [
+    path.join(KIT_ROOT, 'rules', 'android', 'android-architecture.md'),
+    path.join(KIT_ROOT, 'rules', 'android', 'compose-patterns.md'),
+    path.join(KIT_ROOT, 'rules', 'kotlin', 'kotlin-style.md'),
+    path.join(KIT_ROOT, 'rules', 'android', 'security.md'),
+  ].filter(f => fs.existsSync(f));
+
+  const combinedRules = rules.map(f => `### ${path.basename(f)}\n\n` + fs.readFileSync(f, 'utf8')).join('\n\n---\n\n');
+
+  if (target === 'cursor' || target === 'all') {
+    const cursorFile = path.join(targetDir, '.cursorrules');
+    fs.writeFileSync(cursorFile, combinedRules);
+    process.stdout.write(`[EXPORTED] Cursor rules written to ${cursorFile}\n`);
+  }
+
+  if (target === 'copilot' || target === 'all') {
+    const copilotDir = path.join(targetDir, '.github');
+    fs.mkdirSync(copilotDir, { recursive: true });
+    const copilotFile = path.join(copilotDir, 'copilot-instructions.md');
+    fs.writeFileSync(copilotFile, combinedRules);
+    process.stdout.write(`[EXPORTED] GitHub Copilot instructions written to ${copilotFile}\n`);
+  }
+
+  if (target === 'windsurf' || target === 'all') {
+    const windsurfFile = path.join(targetDir, '.windsurfrules');
+    fs.writeFileSync(windsurfFile, combinedRules);
+    process.stdout.write(`[EXPORTED] Windsurf rules written to ${windsurfFile}\n`);
+  }
+}
+
 // ── dispatch ──────────────────────────────────────────────────────────────────
 
 const COMMANDS = {
@@ -219,6 +312,8 @@ const COMMANDS = {
   'repair':         cmdRepair,
   'uninstall':      cmdUninstall,
   'version':        cmdVersion,
+  'audit':          cmdAudit,
+  'export':         cmdExport,
   'feedback':       null, // handled separately (passes remaining argv)
 };
 
@@ -232,6 +327,8 @@ Commands:
   list-installed   list all CAK-managed files from the state file
   doctor           check each file still exists; report [OK] or [MISSING]
   repair           re-copy missing files from the kit source
+  audit            audit the current project's Android/KMP security and build setup
+  export [target]  export rules to other IDEs (cursor, copilot, windsurf, all)
   uninstall        remove all state-tracked files and the state file
   version          print the CAK version
   feedback         print weekly feedback report (default: last 1 week)
@@ -250,6 +347,13 @@ if (!cmd || cmd === '--help' || cmd === '-h') {
 } else if (cmd === 'feedback') {
   try {
     cmdFeedback(process.argv.slice(3));
+  } catch (err) {
+    process.stderr.write(`[ERROR] ${err.message}\n`);
+    process.exit(1);
+  }
+} else if (cmd === 'export' || cmd === 'audit') {
+  try {
+    COMMANDS[cmd](process.argv.slice(3));
   } catch (err) {
     process.stderr.write(`[ERROR] ${err.message}\n`);
     process.exit(1);

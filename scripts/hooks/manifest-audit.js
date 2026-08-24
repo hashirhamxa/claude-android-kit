@@ -69,6 +69,30 @@ function main() {
       `[cak:manifest-audit] Warning: ${filePath} sets android:debuggable="true". Keep that in a /debug/ manifest only.`
     );
   }
+
+  const hasCleartextTrue = /android:usesCleartextTraffic\s*=\s*"true"/i.test(content);
+  if (hasCleartextTrue && !isDebugOnlyManifest) {
+    console.error(
+      `[cak:manifest-audit] Warning: ${filePath} enables android:usesCleartextTraffic="true". Plaintext HTTP should be restricted to debug or explicit network_security_config domains.`
+    );
+  }
+
+  // Check for components containing intent-filter but missing android:exported
+  for (const tagName of COMPONENT_TAGS) {
+    const tagPattern = new RegExp(`<${tagName}\\b([\\s\\S]*?)>([\\s\\S]*?)<\\/${tagName}>`, 'gi');
+    for (const match of content.matchAll(tagPattern)) {
+      const tagAttributes = match[1];
+      const tagBody = match[2];
+      const hasIntentFilter = /<intent-filter\b/i.test(tagBody);
+      const hasExportedAttr = /android:exported\s*=/i.test(tagAttributes);
+
+      if (hasIntentFilter && !hasExportedAttr) {
+        console.error(
+          `[cak:manifest-audit] Warning: <${tagName}> in ${filePath} defines an <intent-filter> without explicit android:exported attribute (required since Android 12).`
+        );
+      }
+    }
+  }
 }
 
 try {

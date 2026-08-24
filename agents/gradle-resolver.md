@@ -42,10 +42,12 @@ Build errors are almost always one of a small number of things. Diagnose the cat
 
 The single most common cause of build failures is an unsupported combination. Always check these alignments:
 
-- **AGP ↔ Gradle** — AGP X requires Gradle ≥ Y. Mismatch → "Minimum supported Gradle version is Y."
-- **AGP ↔ compileSdk** — AGP X requires `compileSdk ≥ Y`. Mismatch → "compileSdk X has not been tested."
-- **Kotlin ↔ Compose Compiler** — every Kotlin version maps to exactly one Compose Compiler version (for the standalone compiler prior to bundling). Check the [androidx compose-compiler-kotlin compatibility map](https://developer.android.com/jetpack/androidx/releases/compose-kotlin).
-- **Kotlin ↔ KSP** — KSP versions are tied to Kotlin. The suffix `-1.0.x` is the KSP version; the prefix is the Kotlin version.
+- **AGP ↔ Gradle** — AGP 8.8 requires Gradle ≥ 8.10.2; AGP 8.9 requires Gradle ≥ 8.11; AGP 9.0 requires Gradle ≥ 8.12. Mismatch → "Minimum supported Gradle version is Y."
+- **AGP ↔ Java toolchain** — AGP 8.0+ requires JDK 17 minimum (JDK 21 recommended for AGP 8.8+).
+- **Kotlin ↔ Compose Compiler**:
+  - **Kotlin 2.0+**: Uses the native Kotlin Compose compiler Gradle plugin `org.jetbrains.kotlin.plugin.compose` (version equals Kotlin version). No separate Compose compiler version needed.
+  - **Kotlin < 2.0**: Every Kotlin version maps to a specific `androidx.compose.compiler:compiler` version. Check the [androidx compose-kotlin compatibility map](https://developer.android.com/jetpack/androidx/releases/compose-kotlin).
+- **Kotlin ↔ KSP** — KSP version prefix must strictly match the Kotlin version (e.g., `2.1.0-1.0.29` for Kotlin `2.1.0`).
 - **KMP target versions** — Kotlin version → Xcode version compatibility for iOS targets.
 
 If the engineer doesn't supply versions, ask for them or read `libs.versions.toml` yourself.
@@ -55,14 +57,17 @@ If the engineer doesn't supply versions, ask for them or read `libs.versions.tom
 **"Plugin with id 'com.android.application' not found"**
 - AGP plugin not declared in root `build.gradle.kts`'s `plugins { }` block with `apply false`, or not in `settings.gradle.kts`'s `pluginManagement { }`.
 
+**"The Compose Compiler plugin is now bundled with Kotlin 2.0+" / "Cannot find androidx.compose.compiler"**
+- Migrating to Kotlin 2.0+: Replace `composeOptions { kotlinCompilerExtensionVersion = ... }` with the plugin `alias(libs.plugins.kotlin.compose)` in both root and module `build.gradle.kts`.
+
 **"Unable to find a matching variant of androidx.compose..."**
 - Compose BOM version mismatch or Kotlin metadata version too new for the consuming project.
 
 **"This version (x.x.x) of the Compose Compiler requires Kotlin version y.y.y"**
-- Kotlin ↔ Compose Compiler matrix broken. Either downgrade Compose Compiler or upgrade Kotlin.
+- Kotlin ↔ Compose Compiler matrix broken. On Kotlin 2.0+, switch to the JetBrains Compose plugin. On Kotlin <2.0, align versions.
 
 **"KSP: Kotlin version y.y.y and KSP version x.x.x-y.y.y.z do not agree"**
-- KSP suffix doesn't match Kotlin version. Pin KSP version to match Kotlin.
+- KSP suffix doesn't match Kotlin version. Pin KSP version in `libs.versions.toml` to match Kotlin.
 
 **"Duplicate class ... found in modules ..."**
 - Transitive dependency conflict. Use `./gradlew :app:dependencies` to find both paths; exclude one.

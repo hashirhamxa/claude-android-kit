@@ -46,25 +46,27 @@ Keep it scannable. Engineers read reviews in two minutes.
 - [ ] `rememberCoroutineScope()` used only from event callbacks, not for initial loads.
 - [ ] No effect that writes to its own input state (infinite recomposition risk).
 
-### Recomposition
+### Recomposition & Performance
 
 - [ ] Lambda parameters don't capture unstable state inline in hot paths.
 - [ ] Lists use `key = { it.id }` in `LazyColumn` / `LazyRow` items.
+- [ ] Lists with multiple item types specify `contentType = { it.type }` to reuse composition slots.
 - [ ] Custom types that can't be proven stable are annotated `@Immutable` or `@Stable`.
 - [ ] No `mutableStateListOf` when an immutable list + state replacement would work.
-- [ ] `derivedStateOf` used only for expensive derivations from multiple inputs — not everywhere.
+- [ ] `derivedStateOf` reads at least one Compose `State` inside its block and changes less frequently than its inputs.
 
-### Modifiers
+### Modifiers & Layout
 
 - [ ] Modifier parameter present on reusable composables, defaulted to `Modifier`.
 - [ ] Modifier is the last parameter before trailing lambdas.
-- [ ] Order of modifier calls matches intent (size → clip → background → clickable → padding).
+- [ ] Order of modifier calls matches intent (size → insets → clip → background → clickable → padding).
+- [ ] Edge-to-edge / WindowInsets: Layout respects `Scaffold` `innerPadding` or applies `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` so content isn't obscured by system bars.
 
 ### Theme & design
 
 - [ ] No hardcoded `Color(...)` — everything from `MaterialTheme.colorScheme`.
 - [ ] No hardcoded `sp` or `dp` for typography — from `MaterialTheme.typography` / spacing tokens.
-- [ ] Dark theme considered; preview includes both.
+- [ ] Dark theme considered; preview includes both light and dark.
 
 ### Previews
 

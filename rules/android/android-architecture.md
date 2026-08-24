@@ -77,32 +77,53 @@ Reach from composables via a `LocalAppContainer` `CompositionLocal`, or from Act
 
 ## ViewModel construction
 
-No `ViewModelProvider.Factory` boilerplate per view model. One generic factory:
+Use the modern AndroidX `viewModelFactory` with `initializer` DSL from `androidx.lifecycle.viewmodel`:
 
 ```kotlin
-inline fun <reified VM : ViewModel> viewModelFactory(crossinline create: () -> VM) =
-    object : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            @Suppress("UNCHECKED_CAST")
-            return create() as T
+val transactionListViewModelFactory = viewModelFactory {
+    initializer {
+        val app = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as App)
+        TransactionListViewModel(app.container.transactionRepository)
+    }
+}
+```
+
+Or inject via composable route:
+
+```kotlin
+@Composable
+fun TransactionListRoute(
+    container: AppContainer = (LocalContext.current.applicationContext as App).container,
+    viewModel: TransactionListViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { TransactionListViewModel(container.transactionRepository) }
         }
-    }
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TransactionListScreen(
+        uiState = uiState,
+        onItemClick = viewModel::onItemClick,
+        onRefresh = viewModel::onRefresh
+    )
+}
 ```
 
-Use from a composable:
-
-```kotlin
-val vm: TransactionListViewModel = viewModel(
-    factory = viewModelFactory {
-        TransactionListViewModel(appContainer.transactionRepository)
-    }
-)
-```
-
-## MVVM rules
+## MVVM & StateFlow rules
 
 - View models own `StateFlow<UiState>` and expose it as a read-only `StateFlow`.
 - `UiState` is a single immutable data class. No separate `isLoading`, `error`, `data` flows.
+- When combining or transforming repository flows, produce state with `SharingStarted.WhileSubscribed(5_000)`:
+  ```kotlin
+  val uiState: StateFlow<TransactionListUiState> = repository.observeTransactions()
+      .map { transactions -> TransactionListUiState(items = transactions.map { it.toUi() }, isLoading = false) }
+      .stateIn(
+          scope = viewModelScope,
+          started = SharingStarted.WhileSubscribed(5_000),
+          initialValue = TransactionListUiState(isLoading = true)
+      )
+  ```
+  *(The 5-second timeout preserves upstream subscriptions during configuration changes like screen rotations without leaking when backgrounded).*
 - View models take repository interfaces, never concrete implementations.
 - No Android framework types (`Context`, `Resources`, `View`) in view models. Ever.
 - `SavedStateHandle` for process-death-surviving state only, not for all state.
@@ -129,11 +150,31 @@ data class TransactionListUiState(
 - Use cases compose repositories; they don't compose other use cases unless there's genuine reuse.
 - If a use case is just a pass-through to a repository, skip it. Not every screen needs a use case layer.
 
-## Navigation
+## Navigation & Edge-to-Edge
 
-- Compose Navigation with type-safe routes (Kotlin serialization-backed).
-- Single Activity. No Fragments in new code.
-- Navigation graph lives in `ui/nav/`, routes defined as `@Serializable object`/`data class`.
+- **Compose Type-Safe Navigation**: Routes are `@Serializable` objects or data classes using `kotlinx.serialization`.
+- Single Activity (`MainActivity`). No Fragments in new code.
+- Always call `enableEdgeToEdge()` in `MainActivity.onCreate()` (enforced by default on Android 15+).
+- Handle window insets explicitly in UI layouts using `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` or `Scaffold`.
+
+```kotlin
+// ui/nav/Routes.kt
+@Serializable object TransactionListRoute
+@Serializable data class TransactionDetailRoute(val transactionId: String)
+
+// NavHost setup
+NavHost(navController = navController, startDestination = TransactionListRoute) {
+    composable<TransactionListRoute> {
+        TransactionListRoute(onNavigateToDetail = { id ->
+            navController.navigate(TransactionDetailRoute(id))
+        })
+    }
+    composable<TransactionDetailRoute> { backStackEntry ->
+        val route: TransactionDetailRoute = backStackEntry.toRoute()
+        TransactionDetailRoute(transactionId = route.transactionId)
+    }
+}
+```
 
 ## Package structure (feature-first)
 
