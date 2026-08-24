@@ -163,7 +163,8 @@ if ((-not $DryRun) -and ($script:filesCopied -gt 0)) {
         installedAt = $isoDate
         files       = $script:installed.ToArray()
     }
-    $state | ConvertTo-Json -Depth 3 -Compress | Set-Content -Path $StateFile -Encoding UTF8
+    $json = $state | ConvertTo-Json -Depth 3 -Compress
+    [System.IO.File]::WriteAllText($StateFile, $json, [System.Text.UTF8Encoding]::new($false))
     Write-Host ""
     Write-Host "State saved: $StateFile"
 }

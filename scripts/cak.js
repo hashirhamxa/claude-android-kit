@@ -28,7 +28,8 @@ function readState() {
     process.exit(1);
   }
   try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const raw = fs.readFileSync(STATE_FILE, 'utf8').replace(/^\uFEFF/, '');
+    return JSON.parse(raw);
   } catch (err) {
     process.stderr.write(`[ERROR] Could not parse state file: ${err.message}\n`);
     process.exit(1);

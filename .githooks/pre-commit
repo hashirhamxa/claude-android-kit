@@ -2,10 +2,23 @@
 
 echo "🔍 [Git Hook] Running SSOT Architecture Validation..."
 
-if ! python3 tools/verify_architecture.py; then
-    echo ""
-    echo "❌ [Git Hook] Commit aborted: Resolve architecture violations listed above."
-    exit 1
+PY_CMD=""
+if command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+    PY_CMD="python3"
+elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then
+    PY_CMD="python"
+elif command -v py >/dev/null 2>&1 && py --version >/dev/null 2>&1; then
+    PY_CMD="py"
+fi
+
+if [ -n "$PY_CMD" ]; then
+    if ! $PY_CMD tools/verify_architecture.py; then
+        echo ""
+        echo "❌ [Git Hook] Commit aborted: Resolve architecture violations listed above."
+        exit 1
+    fi
+else
+    echo "⚠️ [Git Hook] Python runtime not detected; skipping local hook lint."
 fi
 
 echo "✅ [Git Hook] SSOT architecture checks passed."
