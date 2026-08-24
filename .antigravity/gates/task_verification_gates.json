@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "project": "mobile-multiplatform-kit",
+  "verificationGates": [
+    {
+      "id": "gate-architecture-ssot",
+      "name": "SSOT Architecture Linter",
+      "command": "python3 tools/verify_architecture.py",
+      "blocking": true,
+      "description": "Ensures no android.* imports in commonMain, type-safe routes, and collectAsStateWithLifecycle."
+    },
+    {
+      "id": "gate-kmp-compilation",
+      "name": "Multi-Target Build Check",
+      "command": "bash tools/verify_build.sh",
+      "blocking": true,
+      "description": "Verifies that both Android and iOS KMP targets compile cleanly without symbol collision."
+    }
+  ],
+  "agentRoles": {
+    "SharedCoreAgent": {
+      "allowedDirectories": ["core/", "commonMain/", "feature/*/domain/", "feature/*/data/"],
+      "mandatoryGates": ["gate-architecture-ssot", "gate-kmp-compilation"]
+    },
+    "AndroidUiAgent": {
+      "allowedDirectories": ["androidMain/", "feature/*/ui/"],
+      "mandatoryGates": ["gate-architecture-ssot"]
+    },
+    "IosNativeAgent": {
+      "allowedDirectories": ["iosApp/", "iosMain/"],
+      "mandatoryGates": ["gate-kmp-compilation"]
+    }
+  }
+}
